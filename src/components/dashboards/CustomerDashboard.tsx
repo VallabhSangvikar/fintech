@@ -1,0 +1,417 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Send, TrendingUp, Target, DollarSign, Shield, Star, ArrowRight, ExternalLink, Brain } from 'lucide-react';
+import Link from 'next/link';
+
+interface ChatMessage {
+  id: number;
+  type: 'ai' | 'user';
+  message: string;
+  time: string;
+  tips?: string[];
+}
+
+interface InvestmentTip {
+  id: number;
+  title: string;
+  description: string;
+  riskLevel: 'Low' | 'Medium' | 'High';
+  expectedReturn: string;
+  category: string;
+}
+
+const initialChatMessages: ChatMessage[] = [
+  {
+    id: 1,
+    type: 'ai',
+    message: 'Hi Rohan, I\'m your financial assistant. How can I help you improve your financial health today?',
+    time: '09:00 AM',
+  },
+];
+
+const investmentTips: InvestmentTip[] = [
+  {
+    id: 1,
+    title: 'Nifty 50 Index Fund',
+    description: 'Diversified exposure to India\'s top 50 companies with low expense ratio.',
+    riskLevel: 'Low',
+    expectedReturn: '10-12%',
+    category: 'Equity Fund'
+  },
+  {
+    id: 2,
+    title: 'Local Real Estate Opportunity',
+    description: 'Emerging residential area with high growth potential in Bangalore.',
+    riskLevel: 'Medium',
+    expectedReturn: '8-15%',
+    category: 'Real Estate'
+  },
+  {
+    id: 3,
+    title: 'SIP in Large Cap Fund',
+    description: 'Systematic investment in stable large-cap companies.',
+    riskLevel: 'Low',
+    expectedReturn: '9-11%',
+    category: 'Mutual Fund'
+  },
+  {
+    id: 4,
+    title: 'Government Bonds',
+    description: 'Secure fixed-income investment backed by government guarantee.',
+    riskLevel: 'Low',
+    expectedReturn: '6-8%',
+    category: 'Bonds'
+  },
+];
+
+export default function CustomerDashboard() {
+  const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [creditScore, setCreditScore] = useState(742);
+
+  useEffect(() => {
+    // Simulate real-time credit score updates
+    const interval = setInterval(() => {
+      setCreditScore(prev => {
+        const change = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
+        return Math.max(300, Math.min(900, prev + change));
+      });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim()) return;
+
+    const userMessage: ChatMessage = {
+      id: messages.length + 1,
+      type: 'user',
+      message: inputMessage,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    setIsTyping(true);
+
+    // Simulate AI response with tips
+    setTimeout(() => {
+      const aiResponse: ChatMessage = {
+        id: messages.length + 2,
+        type: 'ai',
+        message: 'Great question! Based on your current credit score of 742 and financial profile, here are some personalized recommendations:',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        tips: [
+          'Pay off your credit card balance to improve credit utilization ratio',
+          'Consider increasing your credit limit to lower utilization percentage',
+          'Set up automatic payments to ensure no missed payments',
+          'Keep old credit accounts open to maintain credit history length'
+        ]
+      };
+      setMessages(prev => [...prev, aiResponse]);
+      setIsTyping(false);
+    }, 2000);
+  };
+
+  const getCreditScoreColor = (score: number) => {
+    if (score >= 750) return 'text-emerald-600';
+    if (score >= 650) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getCreditScoreLabel = (score: number) => {
+    if (score >= 750) return 'Excellent';
+    if (score >= 650) return 'Good';
+    return 'Fair';
+  };
+
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case 'Low': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+      case 'Medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'High': return 'text-red-600 bg-red-50 border-red-200';
+      default: return 'text-slate-600 bg-slate-50 border-slate-200';
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* AI Workbench Launch Button */}
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold mb-2">AI Financial Coach</h3>
+            <p className="text-purple-100">Get personalized insights and coaching for your financial goals</p>
+          </div>
+          <Link href="/ai-workbench">
+            <button className="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2">
+              <Brain className="w-5 h-5" />
+              <span>Launch Workbench</span>
+            </button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Welcome Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-emerald-500 rounded-xl p-6 text-white">
+        <h2 className="text-2xl font-bold mb-2">Good morning, Rohan! 👋</h2>
+        <p className="text-blue-100">Your financial health score has improved by 5 points this month. Keep up the great work!</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Credit Score Gauge */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">Your Financial Health</h3>
+            
+            {/* Credit Score Circle */}
+            <div className="relative w-40 h-40 mx-auto mb-4">
+              <svg className="transform -rotate-90 w-40 h-40">
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="70"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="transparent"
+                  className="text-slate-200"
+                />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="70"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="transparent"
+                  strokeDasharray={`${2 * Math.PI * 70}`}
+                  strokeDashoffset={`${2 * Math.PI * 70 * (1 - creditScore / 900)}`}
+                  className={getCreditScoreColor(creditScore)}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center flex-col">
+                <span className={`text-3xl font-bold ${getCreditScoreColor(creditScore)}`}>
+                  {creditScore}
+                </span>
+                <span className="text-sm text-slate-600">Credit Score</span>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                creditScore >= 750 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                creditScore >= 650 ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {getCreditScoreLabel(creditScore)}
+              </span>
+              <p className="text-sm text-slate-600 mt-2">
+                Updated 2 minutes ago
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-slate-200">
+            <div className="text-center">
+              <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full mx-auto mb-2">
+                <TrendingUp className="w-4 h-4 text-blue-600" />
+              </div>
+              <p className="text-sm text-slate-600">This Month</p>
+              <p className="text-lg font-bold text-slate-800">+5</p>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center justify-center w-8 h-8 bg-emerald-100 rounded-full mx-auto mb-2">
+                <Target className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="text-sm text-slate-600">Goal</p>
+              <p className="text-lg font-bold text-slate-800">800</p>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Credit Coach Chat */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200">
+          <div className="p-6 border-b border-slate-200">
+            <h3 className="text-lg font-semibold text-slate-800">AI Credit Coach</h3>
+            <p className="text-sm text-slate-600">Get personalized financial advice and tips</p>
+          </div>
+          
+          <div className="h-80 flex flex-col">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {messages.map((message) => (
+                <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
+                    message.type === 'user' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-slate-100 text-slate-800'
+                  }`}>
+                    <p className="text-sm">{message.message}</p>
+                    
+                    {message.tips && (
+                      <div className="mt-3 pt-3 border-t border-slate-200">
+                        <ul className="space-y-2">
+                          {message.tips.map((tip, index) => (
+                            <li key={index} className="flex items-start space-x-2 text-sm">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                              <span>{tip}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    <p className="text-xs opacity-70 mt-2">{message.time}</p>
+                  </div>
+                </div>
+              ))}
+              
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-100 px-4 py-3 rounded-lg">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <div className="p-4 border-t border-slate-200">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  placeholder="Ask me about improving your credit score, saving tips, or investment advice..."
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!inputMessage.trim()}
+                  className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Personalized Investment Tips */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800">Personalized Investment Tips</h3>
+            <p className="text-sm text-slate-600">Curated opportunities based on your financial profile</p>
+          </div>
+          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center">
+            View All
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {investmentTips.map((tip) => (
+            <div key={tip.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    {tip.category === 'Equity Fund' && <TrendingUp className="w-4 h-4 text-blue-600" />}
+                    {tip.category === 'Real Estate' && <Target className="w-4 h-4 text-blue-600" />}
+                    {tip.category === 'Mutual Fund' && <DollarSign className="w-4 h-4 text-blue-600" />}
+                    {tip.category === 'Bonds' && <Shield className="w-4 h-4 text-blue-600" />}
+                  </div>
+                  <span className={`px-2 py-1 text-xs font-medium rounded border ${getRiskColor(tip.riskLevel)}`}>
+                    {tip.riskLevel}
+                  </span>
+                </div>
+              </div>
+
+              <h4 className="font-semibold text-slate-800 mb-2 line-clamp-2">{tip.title}</h4>
+              <p className="text-sm text-slate-600 mb-3 line-clamp-3">{tip.description}</p>
+              
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-xs text-slate-500">Expected Return</p>
+                  <p className="text-sm font-bold text-emerald-600">{tip.expectedReturn}</p>
+                </div>
+                <div className="flex items-center space-x-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-3 h-3 ${
+                        star <= 4 ? 'text-yellow-400 fill-current' : 'text-slate-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex space-x-2">
+                <button className="flex-1 bg-blue-600 text-white text-sm py-2 px-3 rounded hover:bg-blue-700 transition-colors">
+                  Learn More
+                </button>
+                <button className="p-2 border border-slate-300 rounded hover:bg-slate-50 transition-colors">
+                  <ExternalLink className="w-4 h-4 text-slate-600" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Financial Goals Progress */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h3 className="text-lg font-semibold text-slate-800 mb-4">Your Financial Goals</h3>
+        
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-slate-800">Emergency Fund</h4>
+              <p className="text-sm text-slate-600">₹50,000 of ₹1,00,000</p>
+            </div>
+            <div className="w-32">
+              <div className="bg-slate-200 rounded-full h-2">
+                <div className="bg-blue-600 h-2 rounded-full" style={{ width: '50%' }}></div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-slate-800">Investment Portfolio</h4>
+              <p className="text-sm text-slate-600">₹75,000 of ₹2,00,000</p>
+            </div>
+            <div className="w-32">
+              <div className="bg-slate-200 rounded-full h-2">
+                <div className="bg-emerald-600 h-2 rounded-full" style={{ width: '37.5%' }}></div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-slate-800">Credit Score Goal</h4>
+              <p className="text-sm text-slate-600">{creditScore} of 800</p>
+            </div>
+            <div className="w-32">
+              <div className="bg-slate-200 rounded-full h-2">
+                <div className="bg-purple-600 h-2 rounded-full" style={{ width: `${(creditScore / 800) * 100}%` }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
