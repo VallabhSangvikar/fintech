@@ -1,0 +1,1501 @@
+{
+  "info": {
+    "name": "FinSight Backend API - Complete Test Collection",
+    "description": "Comprehensive Postman collection for testing all 37 FinSight backend API endpoints across 4 development phases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "org_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "organization_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "document_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "goal_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔒 Phase 1: Authentication & User Foundation",
+      "item": [
+        {
+          "name": "1.1 Health Check (No Auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/test-db",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test-db"]
+            },
+            "description": "Test database connections (MySQL + MongoDB)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.2 Signup - Organization User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.token) {",
+                  "        pm.environment.set('org_token', response.data.token);",
+                  "        pm.environment.set('organization_id', response.data.user.organizationId);",
+                  "        console.log('Organization token saved:', response.data.token.substring(0, 20) + '...');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"John Wealth Manager\",\n  \"email\": \"john@wealthcorp.com\",\n  \"password\": \"SecurePass123!\",\n  \"role\": \"Investment\",\n  \"organization_name\": \"Wealth Management Corp\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/signup",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "signup"]
+            },
+            "description": "Register organization user (Investment/Bank role)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 Signup - Customer User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.token) {",
+                  "        pm.environment.set('customer_token', response.data.token);",
+                  "        console.log('Customer token saved:', response.data.token.substring(0, 20) + '...');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Jane Customer\",\n  \"email\": \"jane@customer.com\",\n  \"password\": \"CustomerPass123!\",\n  \"role\": \"Customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/signup",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "signup"]
+            },
+            "description": "Register individual customer user"
+          },
+          "response": []
+        },
+        {
+          "name": "1.4 Login - Organization User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.token) {",
+                  "        pm.environment.set('auth_token', response.data.token);",
+                  "        pm.environment.set('org_token', response.data.token);",
+                  "        pm.environment.set('user_id', response.data.user.id);",
+                  "        if (response.data.user.organizationId) {",
+                  "            pm.environment.set('organization_id', response.data.user.organizationId);",
+                  "        }",
+                  "        console.log('Login successful, token saved');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@wealthcorp.com\",\n  \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with organization user credentials"
+          },
+          "response": []
+        },
+        {
+          "name": "1.5 Login - Customer User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.token) {",
+                  "        pm.environment.set('customer_token', response.data.token);",
+                  "        console.log('Customer login successful');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jane@customer.com\",\n  \"password\": \"CustomerPass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with customer credentials"
+          },
+          "response": []
+        },
+        {
+          "name": "1.6 Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Get current user profile"
+          },
+          "response": []
+        },
+        {
+          "name": "1.7 Logout User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Logout and invalidate token"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "👤 Phase 2: Customer Onboarding",
+      "item": [
+        {
+          "name": "2.1 Create Customer Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"incomeRange\": \"50000-75000\",\n  \"currentCreditScore\": 750,\n  \"riskAppetite\": \"MODERATE\",\n  \"primaryFinancialGoal\": \"RETIREMENT\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/customer/onboarding",
+              "host": ["{{base_url}}"],
+              "path": ["api", "customer", "onboarding"]
+            },
+            "description": "Create customer onboarding profile (Customer token required)"
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 Get Customer Profiles (Org)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/customer/onboarding?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "customer", "onboarding"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "List customer profiles (Organization token required)"
+          },
+          "response": []
+        },
+        {
+          "name": "2.3 Update Customer Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"incomeRange\": \"75000-100000\",\n  \"currentCreditScore\": 780,\n  \"riskAppetite\": \"AGGRESSIVE\",\n  \"primaryFinancialGoal\": \"WEALTH_BUILDING\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/customer/onboarding",
+              "host": ["{{base_url}}"],
+              "path": ["api", "customer", "onboarding"]
+            },
+            "description": "Update customer profile"
+          },
+          "response": []
+        },
+        {
+          "name": "2.4 Get Onboarding Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/customer/onboarding-status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "customer", "onboarding-status"]
+            },
+            "description": "Check customer onboarding completion status"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📚 Phase 2: Knowledge Base Management",
+      "item": [
+        {
+          "name": "2.5 Upload Knowledge Base Document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "/path/to/test-document.pdf",
+                  "description": "Knowledge base document file"
+                },
+                {
+                  "key": "category",
+                  "value": "LOAN_COMPLIANCE",
+                  "type": "text",
+                  "description": "LOAN_COMPLIANCE | ESG_POLICY | REGULATORY_STANDARD"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/knowledge-base",
+              "host": ["{{base_url}}"],
+              "path": ["api", "knowledge-base"]
+            },
+            "description": "Upload knowledge base documents (Organization token required)"
+          },
+          "response": []
+        },
+        {
+          "name": "2.6 List Knowledge Base Documents",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/knowledge-base?page=1&limit=20&category=LOAN_COMPLIANCE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "knowledge-base"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "category",
+                  "value": "LOAN_COMPLIANCE",
+                  "description": "Optional filter"
+                }
+              ]
+            },
+            "description": "List knowledge base documents with pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "2.7 Delete Knowledge Base Document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/knowledge-base?documentId={{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "knowledge-base"],
+              "query": [
+                {
+                  "key": "documentId",
+                  "value": "{{document_id}}",
+                  "description": "ID from upload response"
+                }
+              ]
+            },
+            "description": "Delete knowledge base document"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📄 Phase 3: Document Management",
+      "item": [
+        {
+          "name": "3.1 Upload Client Documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.documents.length > 0) {",
+                  "        pm.environment.set('document_id', response.data.documents[0].id);",
+                  "        console.log('Document ID saved:', response.data.documents[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "/path/to/client-document.pdf",
+                  "description": "Client document file"
+                },
+                {
+                  "key": "documentType",
+                  "value": "INVESTMENT_PLAN",
+                  "type": "text",
+                  "description": "INVESTMENT_PLAN | LOAN_APPLICATION | FINANCIAL_REPORT"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/documents",
+              "host": ["{{base_url}}"],
+              "path": ["api", "documents"]
+            },
+            "description": "Upload client documents"
+          },
+          "response": []
+        },
+        {
+          "name": "3.2 List Documents",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/documents?page=1&limit=10&documentType=INVESTMENT_PLAN",
+              "host": ["{{base_url}}"],
+              "path": ["api", "documents"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "documentType",
+                  "value": "INVESTMENT_PLAN",
+                  "description": "Optional filter"
+                }
+              ]
+            },
+            "description": "List documents with pagination and filters"
+          },
+          "response": []
+        },
+        {
+          "name": "3.3 Get Specific Document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "documents", "{{document_id}}"]
+            },
+            "description": "Get specific document details"
+          },
+          "response": []
+        },
+        {
+          "name": "3.4 Update Document Metadata",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"FINANCIAL_REPORT\",\n  \"notes\": \"Updated document metadata\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "documents", "{{document_id}}"]
+            },
+            "description": "Update document metadata"
+          },
+          "response": []
+        },
+        {
+          "name": "3.5 Delete Document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "documents", "{{document_id}}"]
+            },
+            "description": "Delete document"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎯 Phase 3: Financial Goals",
+      "item": [
+        {
+          "name": "3.6 Create Financial Goal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.id) {",
+                  "        pm.environment.set('goal_id', response.data.id.toString());",
+                  "        console.log('Goal ID saved:', response.data.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goal_name\": \"Emergency Fund\",\n  \"target_amount\": 50000,\n  \"current_amount\": 15000,\n  \"target_date\": \"2025-12-31\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/goals",
+              "host": ["{{base_url}}"],
+              "path": ["api", "goals"]
+            },
+            "description": "Create financial goal (Customer token required)"
+          },
+          "response": []
+        },
+        {
+          "name": "3.7 List Financial Goals",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/goals?limit=10&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "goals"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "List financial goals with progress calculations"
+          },
+          "response": []
+        },
+        {
+          "name": "3.8 Get Specific Goal",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/goals/{{goal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "goals", "{{goal_id}}"]
+            },
+            "description": "Get specific financial goal details"
+          },
+          "response": []
+        },
+        {
+          "name": "3.9 Update Financial Goal",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goal_name\": \"Emergency Fund - Updated\",\n  \"current_amount\": 20000,\n  \"target_amount\": 60000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/goals/{{goal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "goals", "{{goal_id}}"]
+            },
+            "description": "Update financial goal"
+          },
+          "response": []
+        },
+        {
+          "name": "3.10 Delete Financial Goal",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/goals/{{goal_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "goals", "{{goal_id}}"]
+            },
+            "description": "Delete financial goal"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "👥 Phase 3: Team Management",
+      "item": [
+        {
+          "name": "3.11 List Team Members",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/team?limit=50&offset=0&active=true",
+              "host": ["{{base_url}}"],
+              "path": ["api", "team"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "active",
+                  "value": "true",
+                  "description": "Filter by active status"
+                }
+              ]
+            },
+            "description": "List organization team members"
+          },
+          "response": []
+        },
+        {
+          "name": "3.12 Add Team Member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.user.id) {",
+                  "        pm.environment.set('team_member_id', response.data.user.id);",
+                  "        console.log('Team member ID saved:', response.data.user.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Sarah Portfolio Manager\",\n  \"email\": \"sarah@wealthcorp.com\",\n  \"password\": \"TeamPass123!\",\n  \"role\": \"PORTFOLIO_MANAGER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/team",
+              "host": ["{{base_url}}"],
+              "path": ["api", "team"]
+            },
+            "description": "Add new team member to organization"
+          },
+          "response": []
+        },
+        {
+          "name": "3.13 Get Team Member Details",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/team/{{team_member_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "team", "{{team_member_id}}"]
+            },
+            "description": "Get specific team member details"
+          },
+          "response": []
+        },
+        {
+          "name": "3.14 Update Team Member Role",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"ANALYST\",\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/team/{{team_member_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "team", "{{team_member_id}}"]
+            },
+            "description": "Update team member role or status"
+          },
+          "response": []
+        },
+        {
+          "name": "3.15 Remove Team Member",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/team/{{team_member_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "team", "{{team_member_id}}"]
+            },
+            "description": "Remove team member from organization"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🤖 Phase 4: AI Chat System",
+      "item": [
+        {
+          "name": "4.1 Start New AI Chat Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.sessionId) {",
+                  "        pm.environment.set('session_id', response.data.sessionId);",
+                  "        console.log('AI Session ID saved:', response.data.sessionId);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Hello! Can you help me understand investment portfolio diversification strategies?\",\n  \"context\": {\n    \"analysisType\": \"INVESTMENT_ANALYSIS\",\n    \"customerData\": {\n      \"riskTolerance\": \"MODERATE\",\n      \"investmentHorizon\": \"LONG_TERM\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "chat"]
+            },
+            "description": "Start new AI chat conversation"
+          },
+          "response": []
+        },
+        {
+          "name": "4.2 Continue AI Chat Session",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What are the key principles I should follow for risk management in my portfolio?\",\n  \"sessionId\": \"{{session_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "chat"]
+            },
+            "description": "Continue existing AI chat session"
+          },
+          "response": []
+        },
+        {
+          "name": "4.3 List AI Sessions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ai/sessions?limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "sessions"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "List all AI chat sessions for user"
+          },
+          "response": []
+        },
+        {
+          "name": "4.4 Get Specific AI Session",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ai/sessions?sessionId={{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "sessions"],
+              "query": [
+                {
+                  "key": "sessionId",
+                  "value": "{{session_id}}"
+                }
+              ]
+            },
+            "description": "Get specific AI session with full conversation history"
+          },
+          "response": []
+        },
+        {
+          "name": "4.5 Update AI Session Title",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{session_id}}\",\n  \"sessionTitle\": \"Investment Strategy Discussion - Updated\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/sessions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "sessions"]
+            },
+            "description": "Update AI session title"
+          },
+          "response": []
+        },
+        {
+          "name": "4.6 Delete AI Session",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ai/sessions?sessionId={{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "sessions"],
+              "query": [
+                {
+                  "key": "sessionId",
+                  "value": "{{session_id}}"
+                }
+              ]
+            },
+            "description": "Delete AI chat session"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📊 Phase 4: Document Analysis",
+      "item": [
+        {
+          "name": "4.7 Start Document Analysis",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentId\": \"{{document_id}}\",\n  \"analysisType\": \"INVESTMENT_ANALYSIS\",\n  \"options\": {\n    \"includeRecommendations\": true,\n    \"focusAreas\": [\"RISK_ANALYSIS\", \"PERFORMANCE_METRICS\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/analyze-document",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "analyze-document"]
+            },
+            "description": "Trigger AI analysis of uploaded document"
+          },
+          "response": []
+        },
+        {
+          "name": "4.8 Check Analysis Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ai/analyze-document?documentId={{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "analyze-document"],
+              "query": [
+                {
+                  "key": "documentId",
+                  "value": "{{document_id}}"
+                }
+              ]
+            },
+            "description": "Check document analysis status and get results"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💡 Phase 4: Investment Tips",
+      "item": [
+        {
+          "name": "4.9 Get Investment Tips",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ai/investment-tips?personalized=true&limit=10&category=PORTFOLIO_OPTIMIZATION",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "investment-tips"],
+              "query": [
+                {
+                  "key": "personalized",
+                  "value": "true"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "category",
+                  "value": "PORTFOLIO_OPTIMIZATION",
+                  "description": "Optional filter"
+                }
+              ]
+            },
+            "description": "Get personalized investment tips"
+          },
+          "response": []
+        },
+        {
+          "name": "4.10 Generate Investment Tips",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"riskAppetite\": \"MODERATE\",\n  \"categories\": [\"PORTFOLIO_OPTIMIZATION\", \"RISK_MANAGEMENT\"],\n  \"marketConditions\": \"volatile\",\n  \"customerContext\": {\n    \"age\": 35,\n    \"investmentHorizon\": \"LONG_TERM\",\n    \"financialGoals\": [\"RETIREMENT\", \"WEALTH_BUILDING\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/investment-tips",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "investment-tips"]
+            },
+            "description": "Generate new personalized investment tips"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📁 File Serving & Utilities",
+      "item": [
+        {
+          "name": "5.1 Serve Knowledge Base File",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/uploads/knowledge-base/sample-document.pdf",
+              "host": ["{{base_url}}"],
+              "path": ["api", "uploads", "knowledge-base", "sample-document.pdf"]
+            },
+            "description": "Serve knowledge base document file"
+          },
+          "response": []
+        },
+        {
+          "name": "5.2 Serve Client Document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{org_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/uploads/documents/client-document.pdf",
+              "host": ["{{base_url}}"],
+              "path": ["api", "uploads", "documents", "client-document.pdf"]
+            },
+            "description": "Serve client document file"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Pre-request script for logging",
+          "console.log('Request:', pm.request.method, pm.request.url.toString());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "console.log('Response Status:', pm.response.code);",
+          "console.log('Response Time:', pm.response.responseTime + 'ms');",
+          "",
+          "// Log errors if any",
+          "if (pm.response.code >= 400) {",
+          "    try {",
+          "        const response = pm.response.json();",
+          "        console.error('API Error:', response);",
+          "    } catch (e) {",
+          "        console.error('Response:', pm.response.text());",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ]
+}

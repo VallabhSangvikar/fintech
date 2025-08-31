@@ -4,6 +4,7 @@ import { mysqlPool } from '@/lib/database';
 import { APIResponse } from '@/types/database';
 import path from 'path';
 import fs from 'fs/promises';
+import { console } from 'inspector';
 
 interface DocumentDetails {
   id: string;
@@ -26,9 +27,9 @@ export async function GET(
     if (!authResult.success || !authResult.user) {
       return authResult.response!;
     }
-
     const { user } = authResult;
-    const documentId = params.id;
+    const x = await params;
+    const documentId =x.id;
 
     // Check if user has organization access
     const orgCheckResult = requireOrganization(user);
@@ -93,9 +94,9 @@ export async function DELETE(
     if (!authResult.success || !authResult.user) {
       return authResult.response!;
     }
-
+    const x = await params;
     const { user } = authResult;
-    const documentId = params.id;
+    const documentId = x.id;
 
     // Check if user has organization access
     const orgCheckResult = requireOrganization(user);
@@ -167,9 +168,9 @@ export async function PUT(
     if (!authResult.success || !authResult.user) {
       return authResult.response!;
     }
-
+    const x = await params;
     const { user } = authResult;
-    const documentId = params.id;
+    const documentId = x.id;
     const body = await request.json();
     const { status } = body;
 
@@ -206,6 +207,7 @@ export async function PUT(
         'UPDATE documents SET status = ? WHERE id = ?',
         [status, documentId]
       );
+      console.log('Document status updated:', documentId);
     }
 
     return NextResponse.json(
