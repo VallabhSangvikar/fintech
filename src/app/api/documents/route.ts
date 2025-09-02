@@ -187,8 +187,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const documentType = searchParams.get('type');
     const status = searchParams.get('status');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.max(1, parseInt(searchParams.get('limit') || '50')) || 50;
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0')) || 0;
 
     let query = `
       SELECT 
@@ -215,8 +215,8 @@ export async function GET(request: NextRequest) {
       params.push(status);
     }
 
-    query += ' ORDER BY d.uploaded_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    query += ` ORDER BY d.uploaded_at DESC LIMIT ? OFFSET ?`;
+    params.push(limit.toString(), offset.toString());
 
     const [rows] = await mysqlPool.execute(query, params) as any;
 

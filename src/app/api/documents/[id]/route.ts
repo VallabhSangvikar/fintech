@@ -19,17 +19,16 @@ interface DocumentDetails {
 // GET - Get individual document details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const authResult = await requireAuth(request);
     
     if (!authResult.success || !authResult.user) {
       return authResult.response!;
     }
     const { user } = authResult;
-    const x = await params;
-    const documentId =x.id;
 
     // Check if user has organization access
     const orgCheckResult = requireOrganization(user);
@@ -49,7 +48,7 @@ export async function GET(
       FROM documents d
       JOIN users u ON d.uploaded_by_id = u.id
       WHERE d.id = ? AND d.organization_id = ?
-    `, [documentId, user.organizationId]) as any;
+    `, [id, user.organizationId]) as any;
 
     if (rows.length === 0) {
       return NextResponse.json(

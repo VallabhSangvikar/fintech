@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
     const isActive = searchParams.get('active');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.max(1, parseInt(searchParams.get('limit') || '50')) || 50;
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0')) || 0;
 
     let query = `
       SELECT 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     }
 
     query += ' ORDER BY tm.joined_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    params.push(limit.toString(), offset.toString());
 
     const [rows] = await mysqlPool.execute(query, params) as any;
 

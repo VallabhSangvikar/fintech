@@ -22,9 +22,10 @@ interface UpdateTeamMemberRequest {
 // GET - Get individual team member details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId } = await params;
     const authResult = await requireAuth(request);
     
     if (!authResult.success || !authResult.user) {
@@ -32,7 +33,7 @@ export async function GET(
     }
 
     const { user } = authResult;
-    const targetUserId = params.userId;
+    const targetUserId = userId;
 
     // Check organization access
     const orgCheckResult = requireOrganization(user);
@@ -91,9 +92,10 @@ export async function GET(
 // PUT - Update team member role or status (Admin only)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId } = await params;
     const authResult = await requireAuth(request);
     
     if (!authResult.success || !authResult.user) {
@@ -101,7 +103,7 @@ export async function PUT(
     }
 
     const { user } = authResult;
-    const targetUserId = params.userId;
+    const targetUserId = userId;
 
     // Check organization access and admin role
     const orgCheckResult = requireOrganization(user);
@@ -235,9 +237,10 @@ export async function PUT(
 // DELETE - Remove team member from organization (Admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId } = await params;
     const authResult = await requireAuth(request);
     
     if (!authResult.success || !authResult.user) {
@@ -245,7 +248,7 @@ export async function DELETE(
     }
 
     const { user } = authResult;
-    const targetUserId = params.userId;
+    const targetUserId = userId;
 
     // Check organization access and admin role
     const orgCheckResult = requireOrganization(user);

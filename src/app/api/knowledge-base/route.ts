@@ -106,24 +106,22 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(bytes);
         await fs.writeFile(filePath, buffer);
 
-        // Save to database
-        const documentId = uuidv4();
-        await connection.execute(
+        // Save to database (using auto-increment id)
+        const [insertResult] = await connection.execute(
           `INSERT INTO knowledge_base_documents 
-           (id, organization_id, uploaded_by_id, file_name, storage_url, document_category, is_active, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, true, NOW())`,
+           (organization_id, uploaded_by_id, file_name, storage_url, document_category, is_active, created_at) 
+           VALUES (?, ?, ?, ?, ?, true, NOW())`,
           [
-            documentId,
             user.organizationId,
             user.userId,
             file.name,
             `/uploads/knowledge-base/${uniqueFileName}`,
             category
           ]
-        );
+        ) as any;
 
         uploadedDocuments.push({
-          id: documentId,
+          id: insertResult.insertId,
           fileName: file.name,
           documentCategory: category as any,
           filePath: `/uploads/knowledge-base/${uniqueFileName}`,

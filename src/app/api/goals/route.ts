@@ -161,8 +161,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const sortBy = searchParams.get('sort') || 'created_at';
     const order = searchParams.get('order') || 'desc';
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.max(1, parseInt(searchParams.get('limit') || '20')) || 20;
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0')) || 0;
 
     // Validate sort parameters
     const allowedSortFields = ['created_at', 'target_date', 'target_amount', 'current_amount', 'goal_name'];
@@ -175,12 +175,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const query = `SELECT * FROM financial_goals WHERE user_id = ? ORDER BY ${sortBy} ${order.toUpperCase()} LIMIT ? OFFSET ?`;
+
     const [rows] = await mysqlPool.execute(
-      `SELECT * FROM financial_goals 
-       WHERE user_id = ? 
-       ORDER BY ${sortBy} ${order.toUpperCase()}
-       LIMIT ? OFFSET ?`,
-      [user.userId, limit, offset]
+      query,
+      [user.userId, limit.toString(), offset.toString()]
     ) as any;
 
     // Get total count
