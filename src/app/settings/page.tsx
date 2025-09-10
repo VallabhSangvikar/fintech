@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { 
   User, 
   Shield, 
@@ -72,6 +74,13 @@ export default function SettingsPage() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(sampleTeamMembers);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [isPasswordChanging, setIsPasswordChanging] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    full_name: '',
+    email: '',
+    phone: ''
+  });
   
   // Invite member form state
   const [inviteForm, setInviteForm] = useState({
@@ -130,27 +139,99 @@ export default function SettingsPage() {
 
   const userInfo = getUserInfo();
   const userRole = getUserRole();
+  const { user } = useAuth();
+
+  // Initialize profile form with current user data
+  useEffect(() => {
+    setProfileForm({
+      full_name: userInfo.name,
+      email: userInfo.email,
+      phone: '' // This would come from user profile API
+    });
+  }, [userInfo.name, userInfo.email]);
+
+  // Profile update handler
+  const handleProfileSave = async () => {
+    setIsProfileSaving(true);
+    
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(profileForm)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+
+      const result = await response.json();
+      
+      // Update local storage or context if needed
+      alert('Profile updated successfully');
+      
+    } catch (error) {
+      console.error('Profile update error:', error);
+      alert('Failed to update profile. Please try again.');
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
 
   // Invite member functions
-  const handleInviteMember = () => {
+  const handleInviteMember = async () => {
     if (!inviteForm.email || !inviteForm.firstName || !inviteForm.lastName || !inviteForm.role) {
+      alert('Please fill in all required fields');
       return;
     }
 
-    const newMember: TeamMember = {
-      id: Date.now(),
-      name: `${inviteForm.firstName} ${inviteForm.lastName}`,
-      email: inviteForm.email,
-      role: inviteForm.role,
-      department: inviteForm.department || 'General',
-      status: 'pending',
-      avatar: `${inviteForm.firstName.charAt(0)}${inviteForm.lastName.charAt(0)}`,
-      joinedAt: new Date().toISOString().split('T')[0]
-    };
+    try {
+      const response = await fetch('/api/team/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          email: inviteForm.email,
+          firstName: inviteForm.firstName,
+          lastName: inviteForm.lastName,
+          role: inviteForm.role,
+          department: inviteForm.department || 'General'
+        })
+      });
 
-    setTeamMembers([...teamMembers, newMember]);
-    setShowInviteModal(false);
-    resetInviteForm();
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to send invitation');
+      }
+
+      const result = await response.json();
+      
+      // Add the new team member to local state for immediate feedback
+      const newMember: TeamMember = {
+        id: result.id || Date.now(),
+        name: `${inviteForm.firstName} ${inviteForm.lastName}`,
+        email: inviteForm.email,
+        role: inviteForm.role,
+        department: inviteForm.department || 'General',
+        status: 'pending',
+        avatar: `${inviteForm.firstName.charAt(0)}${inviteForm.lastName.charAt(0)}`,
+        joinedAt: new Date().toISOString().split('T')[0]
+      };
+
+      setTeamMembers([...teamMembers, newMember]);
+      setShowInviteModal(false);
+      resetInviteForm();
+      alert('Invitation sent successfully');
+      
+    } catch (error: any) {
+      console.error('Invitation error:', error);
+      alert(error.message || 'Failed to send invitation. Please try again.');
+    }
   };
 
   const resetInviteForm = () => {
@@ -199,7 +280,7 @@ export default function SettingsPage() {
 
   const availableTabs = getAvailableTabs();
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (newPassword !== confirmPassword) {
       alert('Passwords do not match');
       return;
@@ -208,11 +289,38 @@ export default function SettingsPage() {
       alert('Password must be at least 8 characters');
       return;
     }
-    // Simulate password change
-    alert('Password changed successfully');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+
+    setIsPasswordChanging(true);
+    
+    try {
+      const response = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          currentPassword: currentPassword,
+          newPassword: newPassword
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to change password');
+      }
+
+      alert('Password changed successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+    } catch (error: any) {
+      console.error('Password change error:', error);
+      alert(error.message || 'Failed to change password. Please try again.');
+    } finally {
+      setIsPasswordChanging(false);
+    }
   };
 
   const renderProfileTab = () => (
@@ -242,8 +350,21 @@ export default function SettingsPage() {
             <Input
               id="fullName"
               type="text"
-              value={userInfo.name}
-              className="bg-slate-50"
+              value={profileForm.full_name}
+              onChange={(e) => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
+              className="bg-white"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={profileForm.phone}
+              onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+              placeholder="Enter your phone number"
+              className="bg-white"
             />
           </div>
 
@@ -252,7 +373,7 @@ export default function SettingsPage() {
             <Input
               id="email"
               type="email"
-              value={userInfo.email}
+              value={profileForm.email}
               disabled
               className="bg-slate-100 cursor-not-allowed"
             />
@@ -284,7 +405,13 @@ export default function SettingsPage() {
           )}
         </div>
 
-        <Button className="w-full md:w-auto">Save Changes</Button>
+        <Button 
+          className="w-full md:w-auto" 
+          onClick={handleProfileSave}
+          disabled={isProfileSaving}
+        >
+          {isProfileSaving ? 'Saving...' : 'Save Changes'}
+        </Button>
       </CardContent>
     </Card>
   );
@@ -365,7 +492,12 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <Button onClick={handlePasswordChange}>Change Password</Button>
+          <Button 
+            onClick={handlePasswordChange}
+            disabled={isPasswordChanging}
+          >
+            {isPasswordChanging ? 'Changing Password...' : 'Change Password'}
+          </Button>
         </CardContent>
       </Card>
 
@@ -542,7 +674,8 @@ export default function SettingsPage() {
   );
 
   return (
-    <DashboardLayout currentPage="settings">
+    <ProtectedRoute>
+      <DashboardLayout currentPage="settings">
       <div className="p-6">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-bold text-slate-800 mb-8">Settings</h1>
@@ -671,5 +804,6 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
     </DashboardLayout>
+    </ProtectedRoute>
   );
 }

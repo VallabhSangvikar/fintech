@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Send, TrendingUp, Target, DollarSign, Shield, Star, ArrowRight, ExternalLink, Brain } from 'lucide-react';
 import Link from 'next/link';
 
@@ -19,57 +20,109 @@ interface InvestmentTip {
   riskLevel: 'Low' | 'Medium' | 'High';
   expectedReturn: string;
   category: string;
+  confidence?: number;
+  rationale?: string;
+}
+
+interface FinancialGoal {
+  id: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string;
+  category: string;
+  priority: string;
+  status: string;
 }
 
 const initialChatMessages: ChatMessage[] = [
   {
     id: 1,
     type: 'ai',
-    message: 'Hi Rohan, I\'m your financial assistant. How can I help you improve your financial health today?',
+    message: 'Hi! I\'m your financial assistant. How can I help you improve your financial health today?',
     time: '09:00 AM',
   },
 ];
 
-const investmentTips: InvestmentTip[] = [
-  {
-    id: 1,
-    title: 'Nifty 50 Index Fund',
-    description: 'Diversified exposure to India\'s top 50 companies with low expense ratio.',
-    riskLevel: 'Low',
-    expectedReturn: '10-12%',
-    category: 'Equity Fund'
-  },
-  {
-    id: 2,
-    title: 'Local Real Estate Opportunity',
-    description: 'Emerging residential area with high growth potential in Bangalore.',
-    riskLevel: 'Medium',
-    expectedReturn: '8-15%',
-    category: 'Real Estate'
-  },
-  {
-    id: 3,
-    title: 'SIP in Large Cap Fund',
-    description: 'Systematic investment in stable large-cap companies.',
-    riskLevel: 'Low',
-    expectedReturn: '9-11%',
-    category: 'Mutual Fund'
-  },
-  {
-    id: 4,
-    title: 'Government Bonds',
-    description: 'Secure fixed-income investment backed by government guarantee.',
-    riskLevel: 'Low',
-    expectedReturn: '6-8%',
-    category: 'Bonds'
-  },
-];
-
 export default function CustomerDashboard() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [creditScore, setCreditScore] = useState(742);
+  const [investmentTips, setInvestmentTips] = useState<InvestmentTip[]>([]);
+  const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load real data from APIs
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Load investment tips from AI API
+        const tipsResponse = await fetch('/api/ai/investment-tips', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        
+        if (tipsResponse.ok) {
+          const tipsData = await tipsResponse.json();
+          if (tipsData.tips && Array.isArray(tipsData.tips)) {
+            setInvestmentTips(tipsData.tips.slice(0, 4)); // Show top 4 tips
+          }
+        }
+
+        // Load financial goals
+        const goalsResponse = await fetch('/api/goals', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        
+        if (goalsResponse.ok) {
+          const goalsData = await goalsResponse.json();
+          if (goalsData.goals && Array.isArray(goalsData.goals)) {
+            setFinancialGoals(goalsData.goals.slice(0, 3)); // Show top 3 goals
+          }
+        }
+
+        // Load chat sessions (recent AI conversations)
+        const sessionsResponse = await fetch('/api/ai/sessions', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        
+        if (sessionsResponse.ok) {
+          const sessionsData = await sessionsResponse.json();
+          if (sessionsData.sessions && Array.isArray(sessionsData.sessions) && sessionsData.sessions.length > 0) {
+            // Convert recent session messages to chat format
+            const recentSession = sessionsData.sessions[0];
+            if (recentSession.messages && recentSession.messages.length > 0) {
+              const formattedMessages = recentSession.messages.map((msg: { role: string; content: string; timestamp: string }, index: number) => ({
+                id: index + 1,
+                type: msg.role === 'assistant' ? 'ai' : 'user',
+                message: msg.content,
+                time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              }));
+              setMessages([...initialChatMessages, ...formattedMessages.slice(-5)]); // Show last 5 messages
+            }
+          }
+        }
+
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
 
   useEffect(() => {
     // Simulate real-time credit score updates
@@ -97,23 +150,52 @@ export default function CustomerDashboard() {
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate AI response with tips
-    setTimeout(() => {
+    try {
+      // Call real AI chat API
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          message: inputMessage,
+          context: 'customer_dashboard',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const aiResponse: ChatMessage = {
+          id: messages.length + 2,
+          type: 'ai',
+          message: data.response || 'I\'m here to help with your financial questions!',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          tips: data.tips || []
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      } else {
+        // Fallback response
+        const aiResponse: ChatMessage = {
+          id: messages.length + 2,
+          type: 'ai',
+          message: 'I\'m experiencing some technical difficulties. Please try again in a moment.',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      }
+    } catch (error) {
+      console.error('Error sending message to AI:', error);
       const aiResponse: ChatMessage = {
         id: messages.length + 2,
         type: 'ai',
-        message: 'Great question! Based on your current credit score of 742 and financial profile, here are some personalized recommendations:',
+        message: 'I\'m having trouble connecting right now. Please try again later.',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        tips: [
-          'Pay off your credit card balance to improve credit utilization ratio',
-          'Consider increasing your credit limit to lower utilization percentage',
-          'Set up automatic payments to ensure no missed payments',
-          'Keep old credit accounts open to maintain credit history length'
-        ]
       };
       setMessages(prev => [...prev, aiResponse]);
+    } finally {
       setIsTyping(false);
-    }, 2000);
+    }
   };
 
   const getCreditScoreColor = (score: number) => {
@@ -157,7 +239,9 @@ export default function CustomerDashboard() {
 
       {/* Welcome Header */}
       <div className="bg-gradient-to-r from-blue-600 to-emerald-500 rounded-xl p-6 text-white">
-        <h2 className="text-2xl font-bold mb-2">Good morning, Rohan! 👋</h2>
+        <h2 className="text-2xl font-bold mb-2">
+          Good morning, {user?.full_name?.split(' ')[0] || 'there'}! 👋
+        </h2>
         <p className="text-blue-100">Your financial health score has improved by 5 points this month. Keep up the great work!</p>
       </div>
 
@@ -314,14 +398,35 @@ export default function CustomerDashboard() {
             <h3 className="text-lg font-semibold text-slate-800">Personalized Investment Tips</h3>
             <p className="text-sm text-slate-600">Curated opportunities based on your financial profile</p>
           </div>
-          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center">
+          <Link href="/investment-tips" className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center">
             View All
             <ArrowRight className="w-4 h-4 ml-1" />
-          </button>
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {investmentTips.map((tip) => (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="border border-slate-200 rounded-lg p-4 animate-pulse">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-slate-200 rounded-lg"></div>
+                    <div className="w-16 h-4 bg-slate-200 rounded"></div>
+                  </div>
+                </div>
+                <div className="h-4 bg-slate-200 rounded mb-2"></div>
+                <div className="h-3 bg-slate-200 rounded mb-3 w-3/4"></div>
+                <div className="h-3 bg-slate-200 rounded mb-4 w-1/2"></div>
+                <div className="flex space-x-2">
+                  <div className="flex-1 h-8 bg-slate-200 rounded"></div>
+                  <div className="w-8 h-8 bg-slate-200 rounded"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : investmentTips.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {investmentTips.map((tip) => (
             <div key={tip.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center space-x-2">
@@ -367,50 +472,97 @@ export default function CustomerDashboard() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <TrendingUp className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 mb-4">No investment tips available</p>
+            <Link 
+              href="/investment-tips" 
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            >
+              Explore Investment Options
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Financial Goals Progress */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Your Financial Goals</h3>
-        
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-slate-800">Emergency Fund</h4>
-              <p className="text-sm text-slate-600">₹50,000 of ₹1,00,000</p>
-            </div>
-            <div className="w-32">
-              <div className="bg-slate-200 rounded-full h-2">
-                <div className="bg-blue-600 h-2 rounded-full" style={{ width: '50%' }}></div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-slate-800">Investment Portfolio</h4>
-              <p className="text-sm text-slate-600">₹75,000 of ₹2,00,000</p>
-            </div>
-            <div className="w-32">
-              <div className="bg-slate-200 rounded-full h-2">
-                <div className="bg-emerald-600 h-2 rounded-full" style={{ width: '37.5%' }}></div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-slate-800">Credit Score Goal</h4>
-              <p className="text-sm text-slate-600">{creditScore} of 800</p>
-            </div>
-            <div className="w-32">
-              <div className="bg-slate-200 rounded-full h-2">
-                <div className="bg-purple-600 h-2 rounded-full" style={{ width: `${(creditScore / 800) * 100}%` }}></div>
-              </div>
-            </div>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-slate-800">Your Financial Goals</h3>
+          <Link href="/goals" className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center">
+            View All
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </Link>
         </div>
+        
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="h-4 bg-slate-200 rounded w-32 mb-2"></div>
+                    <div className="h-3 bg-slate-200 rounded w-24"></div>
+                  </div>
+                  <div className="w-32">
+                    <div className="bg-slate-200 rounded-full h-2"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : financialGoals.length > 0 ? (
+          <div className="space-y-4">
+            {financialGoals.map((goal) => {
+              const progressPercentage = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+              const formatAmount = (amount: number) => {
+                if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
+                if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+                if (amount >= 1000) return `₹${(amount / 1000).toFixed(0)}K`;
+                return `₹${amount.toFixed(0)}`;
+              };
+              
+              const getProgressColor = () => {
+                if (goal.category === 'emergency') return 'bg-blue-600';
+                if (goal.category === 'investment') return 'bg-emerald-600';
+                if (goal.category === 'retirement') return 'bg-purple-600';
+                return 'bg-slate-600';
+              };
+
+              return (
+                <div key={goal.id} className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-slate-800">{goal.title}</h4>
+                    <p className="text-sm text-slate-600">
+                      {formatAmount(goal.currentAmount)} of {formatAmount(goal.targetAmount)}
+                    </p>
+                  </div>
+                  <div className="w-32">
+                    <div className="bg-slate-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full ${getProgressColor()}`} 
+                        style={{ width: `${Math.min(progressPercentage, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Target className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 mb-4">No financial goals yet</p>
+            <Link 
+              href="/goals" 
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+            >
+              Set Your First Goal
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

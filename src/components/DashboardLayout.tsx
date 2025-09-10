@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth, User } from '@/contexts/AuthContext';
 import { 
   LayoutDashboard, 
   MessageSquare, 
@@ -10,13 +11,14 @@ import {
   TrendingUp,
   Search,
   Bell,
-  User,
+  User as UserIcon,
   ChevronDown,
   Menu,
   X,
   Brain,
   Target,
-  Lightbulb
+  Lightbulb,
+  LogOut
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -25,19 +27,21 @@ interface DashboardLayoutProps {
   currentPage: string;
 }
 
-// Get navigation items based on user role
-const getNavigationItems = (userRole: string) => {
+// Get navigation items based on user role and organization type
+const getNavigationItems = (user: User | null) => {
   const baseItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { id: 'ai-workbench', label: 'AI Workbench', icon: Brain, href: '/ai-workbench' },
   ];
   
   // Add role-specific items
-  if (userRole === 'investment' || userRole === 'bank') {
+  if (user?.organizationId) {
+    // Organization user (Investment or Bank)
     baseItems.push(
       { id: 'documents', label: 'Document Center', icon: FileText, href: '/documents' }
     );
-  } else if (userRole === 'customer') {
+  } else {
+    // Individual customer
     baseItems.push(
       { id: 'investment-tips', label: 'Investment Tips', icon: Lightbulb, href: '/investment-tips' },
       { id: 'goals', label: 'My Goals', icon: Target, href: '/goals' }
@@ -48,42 +52,34 @@ const getNavigationItems = (userRole: string) => {
 };
 
 export default function DashboardLayout({ children, currentPage }: DashboardLayoutProps) {
+  const { user, logout } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
-  const currentUser = {
-    name: 'Anand Sharma',
-    role: 'Investment Analyst',
-    email: 'anand.sharma@example.com',
-    avatar: 'AS'
-  };
-
-  // Get user role from localStorage for demo purposes
-  const getUserRole = () => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userRole') || 'customer';
-    }
-    return 'customer';
+  const handleLogout = async () => {
+    await logout();
   };
 
   const getUserDisplayInfo = () => {
-    const role = getUserRole();
-    switch (role) {
-      case 'investment':
-        return { name: 'Anand Sharma', role: 'Investment Analyst', avatar: 'AS' };
-      case 'bank':
-        return { name: 'Priya Singh', role: 'Lending Manager', avatar: 'PS' };
-      case 'customer':
-        return { name: 'Rohan Verma', role: 'Customer', avatar: 'RV' };
-      default:
-        return { name: 'Rohan Verma', role: 'Customer', avatar: 'RV' };
-    }
+    if (!user) return { name: 'Guest', role: 'Guest', avatar: 'G' };
+    
+    const initials = user.full_name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase();
+    
+    return {
+      name: user.full_name,
+      role: user.organizationName ? `${user.role || 'Member'} at ${user.organizationName}` : 'Customer',
+      avatar: initials,
+      email: user.email
+    };
   };
 
   const userInfo = getUserDisplayInfo();
-  const userRole = getUserRole();
-  const navigationItems = getNavigationItems(userRole);
+  const navigationItems = getNavigationItems(user);
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -219,7 +215,11 @@ export default function DashboardLayout({ children, currentPage }: DashboardLayo
                     Settings
                   </Link>
                   <hr className="my-1" />
-                  <button className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full text-left flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
                     Sign out
                   </button>
                 </div>

@@ -4,38 +4,38 @@ import { useState } from 'react';
 import { ArrowLeft, TrendingUp, Eye, EyeOff, Building2, Users, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-type PersonaType = 'investment' | 'bank' | 'customer';
+type PersonaType = 'Investment' | 'Bank' | 'Customer';
 
 interface FormData {
   role: PersonaType;
-  fullName: string;
+  full_name: string;
   email: string;
   password: string;
-  institutionName?: string;
-  bankName?: string;
+  organization_name?: string;
 }
 
 const personaInfo = {
-  investment: {
+  Investment: {
     title: "Investment Institution",
     icon: TrendingUp,
     description: "Manage portfolios, analyze market trends, and optimize investment strategies with AI-powered insights.",
     features: ["Portfolio Analysis", "Market Intelligence", "Risk Assessment", "Compliance Tools"],
     color: "blue"
   },
-  bank: {
+  Bank: {
     title: "Banking Institution", 
     icon: Building2,
     description: "Streamline loan processing, detect fraud, and ensure regulatory compliance with automated tools.",
     features: ["Document Analysis", "Fraud Detection", "Compliance Check", "Risk Management"],
     color: "emerald"
   },
-  customer: {
+  Customer: {
     title: "Individual Customer",
     icon: Users,
     description: "Improve your financial health with personalized AI coaching and investment recommendations.",
@@ -46,27 +46,47 @@ const personaInfo = {
 
 export default function SignupPage() {
   const router = useRouter();
+  const { signup } = useAuth();
   const [formData, setFormData] = useState<FormData>({
-    role: 'customer',
-    fullName: '',
+    role: 'Customer',
+    full_name: '',
     email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Redirect based on role
-    if (formData.role === 'customer') {
-      router.push('/onboarding');
-    } else {
-      router.push('/dashboard');
+    try {
+      const signupData = {
+        full_name: formData.full_name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        organization_name: formData.organization_name
+      };
+
+      const result = await signup(signupData);
+      
+      if (result.success) {
+        // Redirect based on role
+        if (formData.role === 'Customer') {
+          router.push('/onboarding');
+        } else {
+          router.push('/dashboard');
+        }
+      } else {
+        setError(result.error || 'Signup failed');
+      }
+    } catch (error) {
+      setError('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -151,13 +171,19 @@ export default function SignupPage() {
             
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                )}
+                
                 {/* Role Selection - Horizontal Layout */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-slate-700">
                     What best describes you?
                   </Label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['investment', 'bank', 'customer'] as PersonaType[]).map((persona) => {
+                    {(['Investment', 'Bank', 'Customer'] as PersonaType[]).map((persona) => {
                       const info = personaInfo[persona];
                       const Icon = info.icon;
                       return (
@@ -196,8 +222,8 @@ export default function SignupPage() {
                       id="fullName"
                       type="text"
                       required
-                      value={formData.fullName}
-                      onChange={(e) => updateFormData('fullName', e.target.value)}
+                      value={formData.full_name}
+                      onChange={(e) => updateFormData('full_name', e.target.value)}
                       placeholder="Enter your full name"
                       className="h-10"
                     />
@@ -206,7 +232,7 @@ export default function SignupPage() {
                   {/* Email */}
                   <div className="space-y-1.5">
                     <Label htmlFor="email" className="text-sm">
-                      {formData.role === 'customer' ? 'Email' : 'Work Email'}
+                      {formData.role === 'Customer' ? 'Email' : 'Work Email'}
                     </Label>
                     <Input
                       id="email"
@@ -214,7 +240,7 @@ export default function SignupPage() {
                       required
                       value={formData.email}
                       onChange={(e) => updateFormData('email', e.target.value)}
-                      placeholder={formData.role === 'customer' ? 'your@email.com' : 'name@company.com'}
+                      placeholder={formData.role === 'Customer' ? 'your@email.com' : 'name@company.com'}
                       className="h-10"
                     />
                   </div>
@@ -246,16 +272,16 @@ export default function SignupPage() {
                 </div>
 
                 {/* Workspace-specific Fields - Only Institution/Bank Name for workspace creation */}
-                {formData.role === 'investment' && (
+                {formData.role === 'Investment' && (
                   <div className="pt-3 border-t border-slate-200">
                     <div className="space-y-1.5">
-                      <Label htmlFor="institutionName" className="text-sm">Institution Name</Label>
+                      <Label htmlFor="organizationName" className="text-sm">Institution Name</Label>
                       <Input
-                        id="institutionName"
+                        id="organizationName"
                         type="text"
                         required
-                        value={formData.institutionName || ''}
-                        onChange={(e) => updateFormData('institutionName', e.target.value)}
+                        value={formData.organization_name || ''}
+                        onChange={(e) => updateFormData('organization_name', e.target.value)}
                         placeholder="ABC Mutual Fund"
                         className="h-10"
                       />
@@ -264,16 +290,16 @@ export default function SignupPage() {
                   </div>
                 )}
 
-                {formData.role === 'bank' && (
+                {formData.role === 'Bank' && (
                   <div className="pt-3 border-t border-slate-200">
                     <div className="space-y-1.5">
-                      <Label htmlFor="bankName" className="text-sm">Bank Name</Label>
+                      <Label htmlFor="organizationName" className="text-sm">Bank Name</Label>
                       <Input
-                        id="bankName"
+                        id="organizationName"
                         type="text"
                         required
-                        value={formData.bankName || ''}
-                        onChange={(e) => updateFormData('bankName', e.target.value)}
+                        value={formData.organization_name || ''}
+                        onChange={(e) => updateFormData('organization_name', e.target.value)}
                         placeholder="National Bank of India"
                         className="h-10"
                       />
@@ -289,7 +315,7 @@ export default function SignupPage() {
                 >
                   {isLoading 
                     ? 'Creating account...' 
-                    : formData.role === 'customer' 
+                    : formData.role === 'Customer' 
                       ? 'Create Account'
                       : 'Create Your Workspace'
                   }

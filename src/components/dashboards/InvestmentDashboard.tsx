@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Send, Paperclip, TrendingUp, TrendingDown, DollarSign, Users, ExternalLink, Brain } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Link from 'next/link';
@@ -56,9 +57,91 @@ const chatMessages: ChatMessage[] = [
 ];
 
 export default function InvestmentDashboard() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState(chatMessages);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [portfolioData, setPortfolioData] = useState([
+    { month: 'Jan', value: 85000 },
+    { month: 'Feb', value: 87500 },
+    { month: 'Mar', value: 82000 },
+    { month: 'Apr', value: 91000 },
+    { month: 'May', value: 95000 },
+    { month: 'Jun', value: 98500 },
+  ]);
+  const [newsItems, setNewsItems] = useState([
+    {
+      id: 1,
+      title: 'Indian Markets Show Strong Q2 Performance',
+      summary: 'Nifty 50 gains 8.5% in second quarter driven by IT and banking sector growth',
+      time: '2h ago',
+      source: 'Economic Times'
+    },
+    {
+      id: 2,
+      title: 'RBI Maintains Repo Rate at 6.5%',
+      summary: 'Central bank keeps rates unchanged amid inflation concerns',
+      time: '4h ago',
+      source: 'Business Standard'
+    },
+    {
+      id: 3,
+      title: 'Foreign Investment Inflows Hit ₹2.1L Crores',
+      summary: 'FPI investments show positive momentum in equity markets',
+      time: '6h ago',
+      source: 'Mint'
+    },
+  ]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load real data from APIs
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Load recent AI sessions for this organization
+        const sessionsResponse = await fetch('/api/ai/sessions', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+        
+        if (sessionsResponse.ok) {
+          const sessionsData = await sessionsResponse.json();
+          if (sessionsData.sessions && Array.isArray(sessionsData.sessions) && sessionsData.sessions.length > 0) {
+            // Convert recent session messages to chat format
+            const recentSession = sessionsData.sessions[0];
+            if (recentSession.messages && recentSession.messages.length > 0) {
+              const formattedMessages = recentSession.messages.map((msg: { role: string; content: string; timestamp: string }, index: number) => ({
+                id: index + 1,
+                type: msg.role === 'assistant' ? 'ai' : 'user',
+                message: msg.content,
+                time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                sources: msg.role === 'assistant' ? [
+                  { id: 1, title: 'Market Analysis Report' },
+                  { id: 2, title: 'Portfolio Performance Data' }
+                ] : undefined
+              }));
+              setMessages([...chatMessages, ...formattedMessages.slice(-5)]); // Show last 5 messages
+            }
+          }
+        }
+
+        // Note: Portfolio and news data could be loaded from additional APIs here
+        // For now keeping mock data but structured for easy API integration
+
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
@@ -74,21 +157,56 @@ export default function InvestmentDashboard() {
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Call real AI chat API with investment context
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          message: inputMessage,
+          context: 'investment_dashboard',
+          organizationType: user?.organizationType,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const aiResponse: ChatMessage = {
+          id: messages.length + 2,
+          type: 'ai',
+          message: data.response || 'I\'m here to help with your investment analysis!',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          sources: data.sources || [
+            { id: 1, title: 'Market Analysis Report' },
+            { id: 2, title: 'Portfolio Performance Data' }
+          ]
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      } else {
+        // Fallback response
+        const aiResponse: ChatMessage = {
+          id: messages.length + 2,
+          type: 'ai',
+          message: 'I\'m experiencing some technical difficulties. Please try again in a moment.',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      }
+    } catch (error) {
+      console.error('Error sending message to AI:', error);
       const aiResponse: ChatMessage = {
         id: messages.length + 2,
         type: 'ai',
-        message: 'Based on your portfolio analysis, I notice a 15% growth in tech sector allocation¹. Your risk-adjusted returns are performing 12% above benchmark². Would you like me to analyze specific sectors or rebalancing opportunities?',
+        message: 'I\'m having trouble connecting right now. Please try again later.',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        sources: [
-          { id: 1, title: 'Portfolio Performance Report Q2 2025' },
-          { id: 2, title: 'Nifty 50 Benchmark Analysis' }
-        ]
       };
       setMessages(prev => [...prev, aiResponse]);
+    } finally {
       setIsTyping(false);
-    }, 2000);
+    }
   };
 
   const handleSourceClick = (sourceId: number) => {

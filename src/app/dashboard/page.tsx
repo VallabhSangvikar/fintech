@@ -1,42 +1,39 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '../../components/DashboardLayout';
 import InvestmentDashboard from '../../components/dashboards/InvestmentDashboard';
 import BankDashboard from '../../components/dashboards/BankDashboard';
 import CustomerDashboard from '../../components/dashboards/CustomerDashboard';
-import PersonaSwitcher from '../../components/PersonaSwitcher';
-
-type UserRole = 'investment' | 'bank' | 'customer';
 
 export default function DashboardPage() {
-  const [userRole, setUserRole] = useState<UserRole>('customer');
-
-  // In a real app, this would come from authentication context/API
-  useEffect(() => {
-    // Simulate fetching user role from auth context or API
-    // For demo purposes, you can change this to test different dashboards
-    const role = localStorage.getItem('userRole') as UserRole || 'customer';
-    setUserRole(role);
-  }, []);
+  const { user } = useAuth();
 
   const renderDashboard = () => {
-    switch (userRole) {
-      case 'investment':
+    if (!user) return <CustomerDashboard />;
+
+    // Determine dashboard based on user role and organization type
+    if (!user.organizationId) {
+      // Individual customer
+      return <CustomerDashboard />;
+    } else {
+      // Organization user - check organization type
+      if (user.organizationType === 'INVESTMENT_FIRM' || user.organizationType === 'WEALTH_MANAGEMENT') {
         return <InvestmentDashboard />;
-      case 'bank':
+      } else if (user.organizationType === 'BANK' || user.organizationType === 'LENDING_INSTITUTION') {
         return <BankDashboard />;
-      case 'customer':
-        return <CustomerDashboard />;
-      default:
-        return <CustomerDashboard />;
+      } else {
+        return <InvestmentDashboard />; // Default for organizations
+      }
     }
   };
 
   return (
-    <DashboardLayout currentPage="dashboard">
-      {renderDashboard()}
-      <PersonaSwitcher />
-    </DashboardLayout>
+    <ProtectedRoute>
+      <DashboardLayout currentPage="dashboard">
+        {renderDashboard()}
+      </DashboardLayout>
+    </ProtectedRoute>
   );
 }

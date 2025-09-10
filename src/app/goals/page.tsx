@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { Target, Plus, Edit2, Trash2, Calendar, IndianRupee, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,74 +37,9 @@ interface FinancialGoal {
 }
 
 export default function GoalsPage() {
-  const [goals, setGoals] = useState<FinancialGoal[]>([
-    {
-      id: '1',
-      title: 'Emergency Fund',
-      description: 'Build an emergency fund covering 6 months of expenses for financial security.',
-      targetAmount: 600000,
-      currentAmount: 150000,
-      targetDate: '2024-12-31',
-      category: 'emergency',
-      priority: 'high',
-      status: 'in-progress',
-      monthlyContribution: 25000,
-      createdAt: '2024-01-01'
-    },
-    {
-      id: '2',
-      title: 'Retirement Planning',
-      description: 'Long-term retirement corpus to maintain lifestyle after retirement.',
-      targetAmount: 50000000,
-      currentAmount: 2500000,
-      targetDate: '2050-12-31',
-      category: 'retirement',
-      priority: 'high',
-      status: 'in-progress',
-      monthlyContribution: 50000,
-      createdAt: '2024-01-01'
-    },
-    {
-      id: '3',
-      title: 'Dream Home',
-      description: 'Save for down payment of dream home in preferred location.',
-      targetAmount: 2000000,
-      currentAmount: 800000,
-      targetDate: '2026-06-30',
-      category: 'home',
-      priority: 'medium',
-      status: 'in-progress',
-      monthlyContribution: 40000,
-      createdAt: '2024-01-01'
-    },
-    {
-      id: '4',
-      title: 'Child Education Fund',
-      description: 'Education fund for child\'s higher education expenses.',
-      targetAmount: 1500000,
-      currentAmount: 300000,
-      targetDate: '2035-06-30',
-      category: 'education',
-      priority: 'high',
-      status: 'in-progress',
-      monthlyContribution: 15000,
-      createdAt: '2024-01-01'
-    },
-    {
-      id: '5',
-      title: 'European Vacation',
-      description: 'Family trip to Europe covering 3 weeks of travel.',
-      targetAmount: 400000,
-      currentAmount: 400000,
-      targetDate: '2024-06-30',
-      category: 'travel',
-      priority: 'low',
-      status: 'completed',
-      monthlyContribution: 0,
-      createdAt: '2023-06-01'
-    }
-  ]);
-
+  const { user } = useAuth();
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<FinancialGoal | null>(null);
   
@@ -116,6 +53,37 @@ export default function GoalsPage() {
     priority: 'medium' as FinancialGoal['priority'],
     monthlyContribution: ''
   });
+
+  // Load goals from API
+  const loadGoals = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/goals', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.goals && Array.isArray(data.goals)) {
+          setGoals(data.goals);
+        }
+      } else {
+        console.error('Failed to load goals:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error loading goals:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadGoals();
+    }
+  }, [user]);
 
   const categoryColors = {
     'retirement': 'bg-purple-100 text-purple-800',
@@ -160,24 +128,43 @@ export default function GoalsPage() {
     return Math.max(0, diffMonths);
   };
 
-  const handleCreateGoal = () => {
-    const goal: FinancialGoal = {
-      id: Date.now().toString(),
-      title: newGoal.title,
-      description: newGoal.description,
-      targetAmount: parseFloat(newGoal.targetAmount),
-      currentAmount: parseFloat(newGoal.currentAmount) || 0,
-      targetDate: newGoal.targetDate,
-      category: newGoal.category,
-      priority: newGoal.priority,
-      status: parseFloat(newGoal.currentAmount) === 0 ? 'not-started' : 'in-progress',
-      monthlyContribution: parseFloat(newGoal.monthlyContribution) || 0,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    
-    setGoals([...goals, goal]);
-    setIsCreateModalOpen(false);
-    resetForm();
+  const handleCreateGoal = async () => {
+    try {
+      const goalData = {
+        title: newGoal.title,
+        description: newGoal.description,
+        target_amount: parseFloat(newGoal.targetAmount),
+        current_amount: parseFloat(newGoal.currentAmount) || 0,
+        target_date: newGoal.targetDate,
+        category: newGoal.category,
+        priority: newGoal.priority,
+        monthly_contribution: parseFloat(newGoal.monthlyContribution) || 0,
+      };
+
+      const response = await fetch('/api/goals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(goalData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.goal) {
+          // Add the new goal to the list
+          setGoals(prev => [...prev, data.goal]);
+          setIsCreateModalOpen(false);
+          resetForm();
+        }
+      } else {
+        alert('Failed to create goal. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating goal:', error);
+      alert('Failed to create goal. Please try again.');
+    }
   };
 
   const handleEditGoal = (goal: FinancialGoal) => {
@@ -195,43 +182,73 @@ export default function GoalsPage() {
     setIsCreateModalOpen(true);
   };
 
-  const handleUpdateGoal = () => {
+  const handleUpdateGoal = async () => {
     if (!editingGoal) return;
     
-    const currentAmount = parseFloat(newGoal.currentAmount) || 0;
-    const targetAmount = parseFloat(newGoal.targetAmount);
-    
-    let status: FinancialGoal['status'] = 'not-started';
-    if (currentAmount >= targetAmount) {
-      status = 'completed';
-    } else if (currentAmount > 0) {
-      status = 'in-progress';
-    }
+    try {
+      const currentAmount = parseFloat(newGoal.currentAmount) || 0;
+      const targetAmount = parseFloat(newGoal.targetAmount);
+      
+      let status: FinancialGoal['status'] = 'not-started';
+      if (currentAmount >= targetAmount) {
+        status = 'completed';
+      } else if (currentAmount > 0) {
+        status = 'in-progress';
+      }
 
-    setGoals(goals.map(goal => 
-      goal.id === editingGoal.id 
-        ? {
-            ...goal,
-            title: newGoal.title,
-            description: newGoal.description,
-            targetAmount: targetAmount,
-            currentAmount: currentAmount,
-            targetDate: newGoal.targetDate,
-            category: newGoal.category,
-            priority: newGoal.priority,
-            monthlyContribution: parseFloat(newGoal.monthlyContribution) || 0,
-            status: status
-          }
-        : goal
-    ));
-    
-    setIsCreateModalOpen(false);
-    setEditingGoal(null);
-    resetForm();
+      const response = await fetch(`/api/goals/${editingGoal.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: newGoal.title,
+          description: newGoal.description,
+          targetAmount: targetAmount,
+          currentAmount: currentAmount,
+          targetDate: newGoal.targetDate,
+          category: newGoal.category,
+          priority: newGoal.priority,
+          monthlyContribution: parseFloat(newGoal.monthlyContribution) || 0,
+          status: status
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update goal');
+      }
+
+      // Reload goals from server to get updated data
+      await loadGoals();
+      
+      setIsCreateModalOpen(false);
+      setEditingGoal(null);
+      resetForm();
+    } catch (error) {
+      console.error('Error updating goal:', error);
+      // Could add toast notification here
+    }
   };
 
-  const handleDeleteGoal = (id: string) => {
-    setGoals(goals.filter(goal => goal.id !== id));
+  const handleDeleteGoal = async (id: string) => {
+    try {
+      const response = await fetch(`/api/goals/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete goal');
+      }
+
+      // Reload goals from server to get updated data
+      await loadGoals();
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+      // Could add toast notification here
+    }
   };
 
   const resetForm = () => {
@@ -253,7 +270,8 @@ export default function GoalsPage() {
   const inProgressGoals = goals.filter(goal => goal.status === 'in-progress').length;
 
   return (
-    <DashboardLayout currentPage="goals">
+    <ProtectedRoute>
+      <DashboardLayout currentPage="goals">
       <div className="p-6">
         <div className="max-w-6xl mx-auto">
         {/* Header */}
@@ -326,11 +344,35 @@ export default function GoalsPage() {
 
         {/* Goals List */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {goals.map(goal => {
-            const progress = calculateProgress(goal.currentAmount, goal.targetAmount);
-            const monthsRemaining = calculateMonthsRemaining(goal.targetDate);
-            const shortfall = Math.max(0, goal.targetAmount - goal.currentAmount);
-            const requiredMonthlyContribution = monthsRemaining > 0 ? shortfall / monthsRemaining : 0;
+          {isLoading ? (
+            // Loading skeleton
+            [1, 2, 3, 4].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="h-6 bg-slate-200 rounded mb-2 w-3/4"></div>
+                      <div className="h-4 bg-slate-200 rounded mb-3 w-full"></div>
+                    </div>
+                    <div className="flex space-x-2 ml-4">
+                      <div className="w-8 h-8 bg-slate-200 rounded"></div>
+                      <div className="w-8 h-8 bg-slate-200 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                    <div className="h-2 bg-slate-200 rounded w-full"></div>
+                    <div className="h-4 bg-slate-200 rounded w-2/3"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : goals.length > 0 ? (
+            goals.map(goal => {
+              const progress = calculateProgress(goal.currentAmount, goal.targetAmount);
+              const monthsRemaining = calculateMonthsRemaining(goal.targetDate);
+              const shortfall = Math.max(0, goal.targetAmount - goal.currentAmount);
+              const requiredMonthlyContribution = monthsRemaining > 0 ? shortfall / monthsRemaining : 0;
             
             return (
               <Card key={goal.id} className="hover:shadow-lg transition-shadow">
@@ -441,7 +483,22 @@ export default function GoalsPage() {
                 </CardContent>
               </Card>
             );
-          })}
+          })
+          ) : (
+            // Empty state
+            <div className="col-span-2 text-center py-12">
+              <Target className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">No Financial Goals Yet</h3>
+              <p className="text-slate-600 mb-6">Start your financial journey by setting your first goal</p>
+              <Button 
+                onClick={() => setIsCreateModalOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Your First Goal
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Create/Edit Modal */}
@@ -607,5 +664,6 @@ export default function GoalsPage() {
         </div>
       </div>
     </DashboardLayout>
+    </ProtectedRoute>
   );
 }

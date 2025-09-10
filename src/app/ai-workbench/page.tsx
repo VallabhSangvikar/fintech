@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { 
   Brain,
   MessageSquare,
@@ -140,7 +142,7 @@ export default function AIWorkbenchPage() {
     setMessages(getInitialMessages(userRole));
   }
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -151,29 +153,66 @@ export default function AIWorkbenchPage() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputMessage;
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate AI response with widgets
-    setTimeout(() => {
+    try {
+      // Make real API call to chat endpoint
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          message: currentInput,
+          context: 'workbench',
+          userRole: userRole,
+          conversationId: activeConversation || undefined
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        const aiMessage: ChatMessage = {
+          id: messages.length + 2,
+          type: 'ai',
+          content: data.response || 'I apologize, but I encountered an issue processing your request.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          widgets: determineWidgets(currentInput, userRole)
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+      } else {
+        // Fallback to mock response on API failure
+        const aiMessage: ChatMessage = {
+          id: messages.length + 2,
+          type: 'ai',
+          content: getAIResponse(currentInput, userRole),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          widgets: determineWidgets(currentInput, userRole)
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Fallback to mock response on error
       const aiMessage: ChatMessage = {
         id: messages.length + 2,
         type: 'ai',
-        content: getAIResponse(inputMessage, userRole),
+        content: getAIResponse(currentInput, userRole),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        widgets: determineWidgets(inputMessage, userRole)
+        widgets: determineWidgets(currentInput, userRole)
       };
 
       setMessages(prev => [...prev, aiMessage]);
+    } finally {
       setIsTyping(false);
-
-      // Add widgets based on the message
-      if (aiMessage.widgets) {
-        aiMessage.widgets.forEach(widgetType => {
-          addWidget(widgetType);
-        });
-      }
-    }, 1500);
+    }
   };
 
   const getAIResponse = (input: string, role: string): string => {
@@ -541,7 +580,8 @@ export default function AIWorkbenchPage() {
   };
 
   return (
-    <DashboardLayout currentPage="ai-workbench">
+    <ProtectedRoute>
+      <DashboardLayout currentPage="ai-workbench">
       <div className="h-full flex bg-slate-50">
         {/* Left Panel - Context & History */}
         <div className={`${leftPanelCollapsed ? 'w-12' : 'w-80'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col`}>
@@ -708,5 +748,6 @@ export default function AIWorkbenchPage() {
         </div>
       </div>
     </DashboardLayout>
+    </ProtectedRoute>
   );
 }
