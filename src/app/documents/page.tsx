@@ -129,27 +129,35 @@ export default function DocumentCenterPage() {
       setIsLoading(true);
       const response = await fetch('/api/documents', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 
       if (response.ok) {
-        const data = await response.json();
-        if (data.documents && Array.isArray(data.documents)) {
+        const result = await response.json();
+        console.log('Load documents response:', result);
+        
+        if (result.success && result.data && result.data.documents && Array.isArray(result.data.documents)) {
           // Map API response to our Document interface
-          const mappedDocuments = data.documents.map((doc: any) => ({
+          const mappedDocuments = result.data.documents.map((doc: any) => ({
             id: parseInt(doc.id) || doc.id,
             name: doc.fileName || doc.name,
             type: getFileType(doc.fileName || doc.name),
             status: doc.status?.toLowerCase() || 'pending',
-            uploadDate: doc.uploadedAt || doc.uploadDate,
+            uploadDate: new Date(doc.uploadedAt).toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
             uploadedBy: doc.uploadedBy || 'Unknown',
-            size: doc.fileSize || 'Unknown'
+            size: 'Unknown' // Size is not returned by API, would need to be calculated
           }));
+          console.log('Mapped documents:', mappedDocuments);
           setDocuments(mappedDocuments);
+        } else {
+          console.error('Invalid response format:', result);
+          setDocuments([]);
         }
       } else {
-        console.error('Failed to load documents:', response.statusText);
+        const errorResult = await response.json().catch(() => ({}));
+        console.error('Failed to load documents:', response.status, response.statusText, errorResult);
+        setDocuments([]);
       }
     } catch (error) {
       console.error('Error loading documents:', error);
@@ -247,18 +255,18 @@ export default function DocumentCenterPage() {
 
   // Filter documents based on search and filters
   const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (doc.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
-    const matchesUploader = uploaderFilter === 'all' || doc.uploadedBy === uploaderFilter;
+    const matchesUploader = uploaderFilter === 'all' || (doc.uploadedBy || '').includes(uploaderFilter);
     
     return matchesSearch && matchesStatus && matchesUploader;
   });
 
   // Get unique uploaders for filter dropdown
-  const uniqueUploaders = Array.from(new Set(documents.map(doc => doc.uploadedBy)));
+  const uniqueUploaders = Array.from(new Set(documents.map(doc => doc.uploadedBy || 'Unknown').filter(Boolean)));
 
   const handleFileUpload = async (files: FileList) => {
-    const { user } = useAuth();
+    // Use user from component level - don't call useAuth() inside async function
     
     for (const file of Array.from(files)) {
       // Add pending document to UI immediately for better UX
@@ -277,17 +285,13 @@ export default function DocumentCenterPage() {
       try {
         // Create FormData for file upload
         const formData = new FormData();
-        formData.append('file', file);
-        formData.append('metadata', JSON.stringify({
-          name: file.name,
-          type: file.name.split('.').pop()?.toLowerCase() || 'pdf',
-          uploadedBy: user?.full_name || 'Current User'
-        }));
+        formData.append('files', file); // API expects 'files' not 'file'
+        formData.append('documentType', 'FINANCIAL_REPORT'); // API requires documentType
 
         const response = await fetch('/api/documents', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${user?.token}`
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
           },
           body: formData
         });
@@ -296,7 +300,25 @@ export default function DocumentCenterPage() {
           throw new Error(`Upload failed: ${response.statusText}`);
         }
 
-        const uploadedDoc = await response.json();
+        const result = await response.json();
+        
+        if (!result.success || !result.data || !result.data.documents) {
+          throw new Error(result.error || 'Upload failed');
+        }
+
+        // Get the first uploaded document from the response
+        const uploadedDocData = result.data.documents[0];
+        
+        // Convert API response format to frontend Document format
+        const uploadedDoc: Document = {
+          id: uploadedDocData.id,
+          name: uploadedDocData.fileName,
+          type: getFileType(uploadedDocData.fileName),
+          status: uploadedDocData.status?.toLowerCase() || 'pending',
+          uploadDate: new Date(uploadedDocData.uploadedAt).toISOString().split('T')[0],
+          uploadedBy: user?.full_name || 'Current User',
+          size: `${(file.size / 1024 / 1024).toFixed(1)} MB`
+        };
         
         // Replace pending document with uploaded document
         setDocuments(prev => 
@@ -367,7 +389,7 @@ export default function DocumentCenterPage() {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify({
           documentIds: selectedDocuments
@@ -398,7 +420,7 @@ export default function DocumentCenterPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify({
           documentIds: selectedDocuments

@@ -103,7 +103,7 @@ export default function InvestmentDashboard() {
         // Load recent AI sessions for this organization
         const sessionsResponse = await fetch('/api/ai/sessions', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           },
         });
         
@@ -163,7 +163,7 @@ export default function InvestmentDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
         body: JSON.stringify({
           message: inputMessage,

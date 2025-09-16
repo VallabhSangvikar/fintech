@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import apiClient  from '@/services/api-client';
 import { Target, Plus, Edit2, Trash2, Calendar, IndianRupee, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,17 +24,26 @@ import {
 } from '@/components/ui/dialog';
 
 interface FinancialGoal {
-  id: string;
-  title: string;
-  description: string;
-  targetAmount: number;
-  currentAmount: number;
-  targetDate: string;
-  category: 'retirement' | 'education' | 'home' | 'car' | 'travel' | 'emergency' | 'investment' | 'other';
-  priority: 'high' | 'medium' | 'low';
-  status: 'not-started' | 'in-progress' | 'completed';
-  monthlyContribution: number;
-  createdAt: string;
+  id: number;
+  goal_name: string;
+  target_amount: number;
+  current_amount: number;
+  target_date?: string;
+  created_at: string;
+  progress_percentage?: number;
+  days_remaining?: number;
+  
+  // Optional frontend-only fields with defaults
+  title?: string;
+  description?: string;
+  category?: 'retirement' | 'education' | 'home' | 'car' | 'travel' | 'emergency' | 'investment' | 'other';
+  priority?: 'high' | 'medium' | 'low';
+  status?: 'not-started' | 'in-progress' | 'completed';
+  monthlyContribution?: number;
+  targetAmount?: number;
+  currentAmount?: number;
+  targetDate?: string;
+  createdAt?: string;
 }
 
 export default function GoalsPage() {
@@ -42,6 +52,34 @@ export default function GoalsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<FinancialGoal | null>(null);
+
+  // Function to normalize API response and add default values
+  const normalizeGoal = (apiGoal: any): FinancialGoal => {
+    const progress = apiGoal.target_amount > 0 
+      ? (apiGoal.current_amount / apiGoal.target_amount) * 100 
+      : 0;
+      
+    let status: 'not-started' | 'in-progress' | 'completed' = 'not-started';
+    if (progress >= 100) {
+      status = 'completed';
+    } else if (apiGoal.current_amount > 0) {
+      status = 'in-progress';
+    }
+
+    return {
+      ...apiGoal,
+      title: apiGoal.goal_name || '',
+      description: `Financial goal: ${apiGoal.goal_name}`,
+      category: 'other' as const,
+      priority: 'medium' as const,
+      status,
+      monthlyContribution: 0,
+      targetAmount: apiGoal.target_amount,
+      currentAmount: apiGoal.current_amount,
+      targetDate: apiGoal.target_date,
+      createdAt: apiGoal.created_at,
+    };
+  };
   
   const [newGoal, setNewGoal] = useState({
     title: '',
@@ -58,22 +96,23 @@ export default function GoalsPage() {
   const loadGoals = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/goals', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await apiClient.getGoals();
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.goals && Array.isArray(data.goals)) {
-          setGoals(data.goals);
-        }
+      if (response.success && response.data) {
+        // The API returns { goals: [...], pagination: {...}, summary: {...} }
+        // Handle both response formats for compatibility
+        const goals = (response.data as any).goals || response.data;
+        const rawGoals = Array.isArray(goals) ? goals : [];
+        const normalizedGoals = rawGoals.map(normalizeGoal);
+        setGoals(normalizedGoals);
+        console.log('Loaded goals:', normalizedGoals);
       } else {
-        console.error('Failed to load goals:', response.statusText);
+        console.error('Failed to load goals:', response.error);
+        setGoals([]); // Set empty array on error
       }
     } catch (error) {
       console.error('Error loading goals:', error);
+      setGoals([]); // Set empty array on error
     } finally {
       setIsLoading(false);
     }
@@ -81,6 +120,8 @@ export default function GoalsPage() {
 
   useEffect(() => {
     if (user) {
+      console.log('Current user:', user);
+      console.log('User organization ID:', user.organizationId);
       loadGoals();
     }
   }, [user]);
@@ -131,35 +172,27 @@ export default function GoalsPage() {
   const handleCreateGoal = async () => {
     try {
       const goalData = {
-        title: newGoal.title,
-        description: newGoal.description,
+        goal_name: newGoal.title,
         target_amount: parseFloat(newGoal.targetAmount),
         current_amount: parseFloat(newGoal.currentAmount) || 0,
         target_date: newGoal.targetDate,
-        category: newGoal.category,
-        priority: newGoal.priority,
-        monthly_contribution: parseFloat(newGoal.monthlyContribution) || 0,
       };
 
-      const response = await fetch('/api/goals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(goalData),
-      });
+      console.log('Creating goal with data:', goalData);
+      const response = await apiClient.createGoal(goalData);
+      console.log('Create goal response:', response);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.goal) {
-          // Add the new goal to the list
-          setGoals(prev => [...prev, data.goal]);
-          setIsCreateModalOpen(false);
-          resetForm();
-        }
+      if (response.success && response.data) {
+        // Normalize the new goal and add to the list  
+        const normalizedGoal = normalizeGoal(response.data);
+        setGoals(prev => [...prev, normalizedGoal]);
+        setIsCreateModalOpen(false);
+        resetForm();
+        
+        // Reload goals to ensure we have the latest data
+        await loadGoals();
       } else {
-        alert('Failed to create goal. Please try again.');
+        alert(`Failed to create goal: ${response.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error creating goal:', error);
@@ -170,14 +203,14 @@ export default function GoalsPage() {
   const handleEditGoal = (goal: FinancialGoal) => {
     setEditingGoal(goal);
     setNewGoal({
-      title: goal.title,
-      description: goal.description,
-      targetAmount: goal.targetAmount.toString(),
-      currentAmount: goal.currentAmount.toString(),
-      targetDate: goal.targetDate,
-      category: goal.category,
-      priority: goal.priority,
-      monthlyContribution: goal.monthlyContribution.toString()
+      title: goal.goal_name || goal.title || '',
+      description: goal.description || '',
+      targetAmount: (goal.target_amount || goal.targetAmount || 0).toString(),
+      currentAmount: (goal.current_amount || goal.currentAmount || 0).toString(),
+      targetDate: goal.target_date || goal.targetDate || '',
+      category: goal.category || 'other',
+      priority: goal.priority || 'medium',
+      monthlyContribution: (goal.monthlyContribution || 0).toString()
     });
     setIsCreateModalOpen(true);
   };
@@ -186,68 +219,43 @@ export default function GoalsPage() {
     if (!editingGoal) return;
     
     try {
-      const currentAmount = parseFloat(newGoal.currentAmount) || 0;
-      const targetAmount = parseFloat(newGoal.targetAmount);
-      
-      let status: FinancialGoal['status'] = 'not-started';
-      if (currentAmount >= targetAmount) {
-        status = 'completed';
-      } else if (currentAmount > 0) {
-        status = 'in-progress';
+      const goalData = {
+        goal_name: newGoal.title,
+        target_amount: parseFloat(newGoal.targetAmount),
+        current_amount: parseFloat(newGoal.currentAmount) || 0,
+        target_date: newGoal.targetDate,
+      };
+
+      const response = await apiClient.updateGoal(editingGoal.id, goalData);
+
+      if (response.success) {
+        // Reload goals from server to get updated data
+        await loadGoals();
+        setIsCreateModalOpen(false);
+        setEditingGoal(null);
+        resetForm();
+      } else {
+        alert(`Failed to update goal: ${response.error || 'Unknown error'}`);
       }
-
-      const response = await fetch(`/api/goals/${editingGoal.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: newGoal.title,
-          description: newGoal.description,
-          targetAmount: targetAmount,
-          currentAmount: currentAmount,
-          targetDate: newGoal.targetDate,
-          category: newGoal.category,
-          priority: newGoal.priority,
-          monthlyContribution: parseFloat(newGoal.monthlyContribution) || 0,
-          status: status
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update goal');
-      }
-
-      // Reload goals from server to get updated data
-      await loadGoals();
-      
-      setIsCreateModalOpen(false);
-      setEditingGoal(null);
-      resetForm();
     } catch (error) {
       console.error('Error updating goal:', error);
-      // Could add toast notification here
+      alert('Failed to update goal. Please try again.');
     }
   };
 
   const handleDeleteGoal = async (id: string) => {
     try {
-      const response = await fetch(`/api/goals/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+      const response = await apiClient.deleteGoal(parseInt(id));
 
-      if (!response.ok) {
-        throw new Error('Failed to delete goal');
+      if (response.success) {
+        // Reload goals from server to get updated data
+        await loadGoals();
+      } else {
+        alert(`Failed to delete goal: ${response.error || 'Unknown error'}`);
       }
-
-      // Reload goals from server to get updated data
-      await loadGoals();
     } catch (error) {
       console.error('Error deleting goal:', error);
-      // Could add toast notification here
+      alert('Failed to delete goal. Please try again.');
     }
   };
 
@@ -264,10 +272,12 @@ export default function GoalsPage() {
     });
   };
 
-  const totalGoalsValue = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
-  const totalCurrentValue = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
-  const completedGoals = goals.filter(goal => goal.status === 'completed').length;
-  const inProgressGoals = goals.filter(goal => goal.status === 'in-progress').length;
+  // Safely calculate values with array check
+  const goalsArray = Array.isArray(goals) ? goals : [];
+  const totalGoalsValue = goalsArray.reduce((sum, goal) => sum + (goal.target_amount || goal.targetAmount || 0), 0);
+  const totalCurrentValue = goalsArray.reduce((sum, goal) => sum + (goal.current_amount || goal.currentAmount || 0), 0);
+  const completedGoals = goalsArray.filter(goal => (goal.status || 'not-started') === 'completed').length;
+  const inProgressGoals = goalsArray.filter(goal => (goal.status || 'not-started') === 'in-progress').length;
 
   return (
     <ProtectedRoute>
@@ -367,11 +377,14 @@ export default function GoalsPage() {
                 </CardContent>
               </Card>
             ))
-          ) : goals.length > 0 ? (
-            goals.map(goal => {
-              const progress = calculateProgress(goal.currentAmount, goal.targetAmount);
-              const monthsRemaining = calculateMonthsRemaining(goal.targetDate);
-              const shortfall = Math.max(0, goal.targetAmount - goal.currentAmount);
+          ) : goalsArray.length > 0 ? (
+            goalsArray.map(goal => {
+              const currentAmount = goal.current_amount || goal.currentAmount || 0;
+              const targetAmount = goal.target_amount || goal.targetAmount || 0;
+              const targetDate = goal.target_date || goal.targetDate || '';
+              const progress = calculateProgress(currentAmount, targetAmount);
+              const monthsRemaining = calculateMonthsRemaining(targetDate);
+              const shortfall = Math.max(0, targetAmount - currentAmount);
               const requiredMonthlyContribution = monthsRemaining > 0 ? shortfall / monthsRemaining : 0;
             
             return (
@@ -380,19 +393,19 @@ export default function GoalsPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle className="text-lg font-semibold text-slate-900 mb-2">
-                        {goal.title}
+                        {goal.goal_name || goal.title || 'Untitled Goal'}
                       </CardTitle>
-                      <p className="text-sm text-slate-600 mb-3">{goal.description}</p>
+                      <p className="text-sm text-slate-600 mb-3">{goal.description || 'Financial goal'}</p>
                       
                       <div className="flex flex-wrap items-center space-x-2 mb-3">
-                        <Badge className={`${categoryColors[goal.category]} text-xs px-2 py-1`}>
-                          {goal.category.replace('-', ' ').toUpperCase()}
+                        <Badge className={`${categoryColors[goal.category || 'other']} text-xs px-2 py-1`}>
+                          {(goal.category || 'other').replace('-', ' ').toUpperCase()}
                         </Badge>
-                        <Badge className={`${priorityColors[goal.priority]} text-xs px-2 py-1`}>
-                          {goal.priority.toUpperCase()} PRIORITY
+                        <Badge className={`${priorityColors[goal.priority || 'medium']} text-xs px-2 py-1`}>
+                          {(goal.priority || 'medium').toUpperCase()} PRIORITY
                         </Badge>
-                        <Badge className={`${statusColors[goal.status]} text-xs px-2 py-1`}>
-                          {goal.status.replace('-', ' ').toUpperCase()}
+                        <Badge className={`${statusColors[goal.status || 'not-started']} text-xs px-2 py-1`}>
+                          {(goal.status || 'not-started').replace('-', ' ').toUpperCase()}
                         </Badge>
                       </div>
                     </div>
@@ -409,7 +422,7 @@ export default function GoalsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteGoal(goal.id)}
+                        onClick={() => handleDeleteGoal(goal.id.toString())}
                         className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -432,20 +445,20 @@ export default function GoalsPage() {
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                       <p className="text-xs text-slate-500">Current Amount</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(goal.currentAmount)}</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(currentAmount)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Target Amount</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(goal.targetAmount)}</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(targetAmount)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Monthly Contribution</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(goal.monthlyContribution)}</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatCurrency(goal.monthlyContribution || 0)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Target Date</p>
                       <p className="text-sm font-semibold text-slate-900">
-                        {new Date(goal.targetDate).toLocaleDateString()}
+                        {targetDate ? new Date(targetDate).toLocaleDateString() : 'Not set'}
                       </p>
                     </div>
                   </div>
@@ -460,7 +473,7 @@ export default function GoalsPage() {
                           <p>
                             Required Monthly: 
                             <span className={`font-semibold ml-1 ${
-                              requiredMonthlyContribution > goal.monthlyContribution 
+                              requiredMonthlyContribution > (goal.monthlyContribution || 0) 
                                 ? 'text-red-600' 
                                 : 'text-green-600'
                             }`}>

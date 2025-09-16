@@ -205,7 +205,7 @@ export default function SignupPage() {
                             }`}>
                               <Icon className="w-3 h-3" />
                             </div>
-                            <span className="text-xs font-medium text-slate-800">{info.title.replace(' Institution', '').replace('Individual ', '')}</span>
+                            <span className="text-xs font-medium text-slate-800">{(info.title || '').replace(' Institution', '').replace('Individual ', '')}</span>
                           </div>
                         </button>
                       );

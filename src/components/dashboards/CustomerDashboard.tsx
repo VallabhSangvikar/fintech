@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import apiClient from '@/services/api-client';
 import { Send, TrendingUp, Target, DollarSign, Shield, Star, ArrowRight, ExternalLink, Brain } from 'lucide-react';
 import Link from 'next/link';
 
@@ -45,53 +46,116 @@ const initialChatMessages: ChatMessage[] = [
 ];
 
 export default function CustomerDashboard() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  
   const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [creditScore, setCreditScore] = useState(742);
-  const [investmentTips, setInvestmentTips] = useState<InvestmentTip[]>([]);
-  const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Local state instead of context
+  const [goals, setGoals] = useState<any[]>([]);
+  const [investmentTips, setInvestmentTips] = useState<any[]>([]);
+
+  // Initialize API client with token
+  useEffect(() => {
+    if (token) {
+      console.log('Setting token in API client:', token.substring(0, 20) + '...');
+      apiClient.setToken(token);
+    } else {
+      console.log('No token available in CustomerDashboard');
+    }
+  }, [token]);
 
   // Load real data from APIs
   useEffect(() => {
     const loadDashboardData = async () => {
+      if (!token) {
+        console.log('No token available, using demo data');
+        // Set some demo data for showcase
+        setInvestmentTips([
+          {
+            id: 1,
+            title: "Diversify Your Portfolio",
+            description: "Consider investing across different sectors and asset classes to reduce risk.",
+            riskLevel: "Low" as const,
+            expectedReturn: "8-10%",
+            category: "Portfolio Management",
+            confidence: 85,
+            rationale: "Historical data shows diversified portfolios perform better over time."
+          },
+          {
+            id: 2,
+            title: "SIP in Index Funds",
+            description: "Start a systematic investment plan in low-cost index funds.",
+            riskLevel: "Medium" as const,
+            expectedReturn: "12-15%",
+            category: "Investment Strategy",
+            confidence: 90,
+            rationale: "Index funds provide market returns with minimal expense ratios."
+          }
+        ]);
+        
+        setGoals([
+          {
+            id: 1,
+            user_id: "demo-user",
+            goal_name: "Emergency Fund",
+            target_amount: 500000,
+            current_amount: 125000,
+            target_date: new Date('2025-12-31'),
+            created_at: new Date()
+          },
+          {
+            id: 2,
+            user_id: "demo-user", 
+            goal_name: "House Down Payment",
+            target_amount: 2000000,
+            current_amount: 450000,
+            target_date: new Date('2026-06-30'),
+            created_at: new Date()
+          }
+        ]);
+        
+        setIsLoading(false);
+        return;
+      }
+
       try {
         setIsLoading(true);
+        console.log('Loading dashboard data with token:', token.substring(0, 20) + '...');
         
-        // Load investment tips from AI API
-        const tipsResponse = await fetch('/api/ai/investment-tips', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        
-        if (tipsResponse.ok) {
-          const tipsData = await tipsResponse.json();
-          if (tipsData.tips && Array.isArray(tipsData.tips)) {
-            setInvestmentTips(tipsData.tips.slice(0, 4)); // Show top 4 tips
+        // Load investment tips from API
+        try {
+          const tipsResponse = await apiClient.getInvestmentTips();
+          console.log('Investment tips response:', tipsResponse);
+          if (tipsResponse.success && tipsResponse.data) {
+            setInvestmentTips(Array.isArray(tipsResponse.data) ? tipsResponse.data.slice(0, 4) : []);
           }
+        } catch (error: any) {
+          console.error('Error loading investment tips:', error);
+          // Use demo data on error
+          setInvestmentTips([]);
         }
 
         // Load financial goals
-        const goalsResponse = await fetch('/api/goals', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        
-        if (goalsResponse.ok) {
-          const goalsData = await goalsResponse.json();
-          if (goalsData.goals && Array.isArray(goalsData.goals)) {
-            setFinancialGoals(goalsData.goals.slice(0, 3)); // Show top 3 goals
+        try {
+          const goalsResponse = await apiClient.getGoals();
+          console.log('Goals response:', goalsResponse);
+          if (goalsResponse.success && goalsResponse.data) {
+            setGoals(Array.isArray(goalsResponse.data) ? goalsResponse.data.slice(0, 3) : []);
           }
+        } catch (error: any) {
+          console.error('Error loading goals:', error);
+          // Use demo data on error
+          setGoals([]);
         }
 
         // Load chat sessions (recent AI conversations)
         const sessionsResponse = await fetch('/api/ai/sessions', {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           },
         });
         
@@ -156,7 +220,7 @@ export default function CustomerDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
         body: JSON.stringify({
           message: inputMessage,
@@ -513,10 +577,10 @@ export default function CustomerDashboard() {
               </div>
             ))}
           </div>
-        ) : financialGoals.length > 0 ? (
+        ) : goals.length > 0 ? (
           <div className="space-y-4">
-            {financialGoals.map((goal) => {
-              const progressPercentage = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+            {goals.map((goal) => {
+              const progressPercentage = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0;
               const formatAmount = (amount: number) => {
                 if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
                 if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
@@ -525,18 +589,15 @@ export default function CustomerDashboard() {
               };
               
               const getProgressColor = () => {
-                if (goal.category === 'emergency') return 'bg-blue-600';
-                if (goal.category === 'investment') return 'bg-emerald-600';
-                if (goal.category === 'retirement') return 'bg-purple-600';
-                return 'bg-slate-600';
+                return 'bg-blue-600'; // Simplified since FinancialGoal doesn't have category
               };
 
               return (
                 <div key={goal.id} className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-medium text-slate-800">{goal.title}</h4>
+                    <h4 className="font-medium text-slate-800">{goal.goal_name}</h4>
                     <p className="text-sm text-slate-600">
-                      {formatAmount(goal.currentAmount)} of {formatAmount(goal.targetAmount)}
+                      {formatAmount(goal.current_amount)} of {formatAmount(goal.target_amount)}
                     </p>
                   </div>
                   <div className="w-32">

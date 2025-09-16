@@ -18,6 +18,7 @@ export async function requireAuth(request: NextRequest): Promise<{
   const token = extractTokenFromHeader(authHeader || undefined);
 
   if (!token) {
+    console.log('No token provided in request');
     return {
       success: false,
       response: NextResponse.json(
@@ -27,8 +28,10 @@ export async function requireAuth(request: NextRequest): Promise<{
     };
   }
 
+  console.log('Attempting to verify token:', token.substring(0, 20) + '...');
   const decoded = verifyJWT(token);
   if (!decoded) {
+    console.log('Token verification failed for token:', token.substring(0, 20) + '...');
     return {
       success: false,
       response: NextResponse.json(
@@ -37,6 +40,8 @@ export async function requireAuth(request: NextRequest): Promise<{
       ),
     };
   }
+
+  console.log('Token verified successfully for user:', decoded.userId);
 
   // Verify user still exists and token version is valid
   const { mysqlPool } = await import('@/lib/database');

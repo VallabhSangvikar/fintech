@@ -22,19 +22,33 @@ export function generateJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
 
 export function verifyJWT(token: string): JWTPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    // Clean the token - remove any extra spaces or characters
+    const cleanToken = token.trim();
+    if (!cleanToken) {
+      return null;
+    }
+    
+    const decoded = jwt.verify(cleanToken, JWT_SECRET) as JWTPayload;
     return decoded;
-  } catch (error) {
-    console.error('JWT verification failed:', error);
+  } catch (error: any) {
+    console.error('JWT verification failed:', error.message);
+    // For development, let's be more lenient - just return null instead of crashing
     return null;
   }
 }
 
 export function extractTokenFromHeader(authHeader: string | undefined): string | null {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader) {
     return null;
   }
-  return authHeader.substring(7); // Remove "Bearer " prefix
+  
+  // Handle both "Bearer token" and just "token" formats
+  if (authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7).trim();
+  }
+  
+  // If it doesn't start with Bearer, assume it's just the token
+  return authHeader.trim();
 }
 
 // Utility to get user data for JWT payload

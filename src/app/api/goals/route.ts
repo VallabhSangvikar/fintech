@@ -65,13 +65,8 @@ export async function POST(request: NextRequest) {
 
     const { user } = authResult;
 
-    // Ensure this is a customer (no organization for financial goals)
-    if (user.organizationId) {
-      return NextResponse.json(
-        { success: false, error: 'Financial goals are only available for individual customers' } as APIResponse<null>,
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to create financial goals (removed organization restriction)
+    // Both individual customers and organizational users can have personal financial goals
 
     const body: CreateGoalRequest = await request.json();
     const { goal_name, target_amount, current_amount = 0, target_date } = body;
@@ -150,13 +145,8 @@ export async function GET(request: NextRequest) {
 
     const { user } = authResult;
 
-    // Ensure this is a customer
-    if (user.organizationId) {
-      return NextResponse.json(
-        { success: false, error: 'Financial goals are only available for individual customers' } as APIResponse<null>,
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to access their financial goals
+    // Both individual customers and organizational users can have personal financial goals
 
     const { searchParams } = new URL(request.url);
     const sortBy = searchParams.get('sort') || 'created_at';

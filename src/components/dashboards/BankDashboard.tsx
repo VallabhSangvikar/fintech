@@ -354,7 +354,7 @@ export default function BankDashboard() {
                         {uploadedFile.complianceCheck && Object.entries(uploadedFile.complianceCheck).map(([key, value]) => (
                           <div key={key} className="flex items-center justify-between">
                             <span className="text-sm text-slate-600 capitalize">
-                              {key.replace(/([A-Z])/g, ' $1').trim()}
+                              {(key || '').replace(/([A-Z])/g, ' $1').trim()}
                             </span>
                             {value ? (
                               <CheckCircle className="w-5 h-5 text-emerald-600" />

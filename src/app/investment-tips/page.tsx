@@ -64,7 +64,7 @@ export default function InvestmentTipsPage() {
       setIsLoading(true);
       const response = await fetch('/api/ai/investment-tips', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
       });
 
@@ -360,7 +360,7 @@ export default function InvestmentTipsPage() {
                         <div className="flex items-center space-x-2 mb-2">
                           <Badge className={getCategoryColor(tip.category)}>
                             {getCategoryIcon(tip.category)}
-                            <span className="ml-1 capitalize">{tip.category.replace('-', ' ')}</span>
+                            <span className="ml-1 capitalize">{(tip.category || '').replace('-', ' ')}</span>
                           </Badge>
                           <Badge className={getRiskColor(tip.riskLevel)}>
                             <span className="capitalize">{tip.riskLevel} Risk</span>

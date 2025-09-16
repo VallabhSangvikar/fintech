@@ -69,13 +69,8 @@ export async function GET(
       );
     }
 
-    // Ensure this is a customer
-    if (user.organizationId) {
-      return NextResponse.json(
-        { success: false, error: 'Financial goals are only available for individual customers' } as APIResponse<null>,
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to access their financial goals
+    // Both individual customers and organizational users can have personal financial goals
 
     const [rows] = await mysqlPool.execute(
       'SELECT * FROM financial_goals WHERE id = ? AND user_id = ?',
@@ -127,13 +122,8 @@ export async function PUT(
       );
     }
 
-    // Ensure this is a customer
-    if (user.organizationId) {
-      return NextResponse.json(
-        { success: false, error: 'Financial goals are only available for individual customers' } as APIResponse<null>,
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to update their financial goals
+    // Both individual customers and organizational users can have personal financial goals
 
     const body: UpdateGoalRequest = await request.json();
     const { goal_name, target_amount, current_amount, target_date } = body;
@@ -263,13 +253,8 @@ export async function DELETE(
       );
     }
 
-    // Ensure this is a customer
-    if (user.organizationId) {
-      return NextResponse.json(
-        { success: false, error: 'Financial goals are only available for individual customers' } as APIResponse<null>,
-        { status: 403 }
-      );
-    }
+    // Allow all authenticated users to delete their financial goals
+    // Both individual customers and organizational users can have personal financial goals
 
     // Check if goal exists and belongs to user
     const [existingRows] = await mysqlPool.execute(

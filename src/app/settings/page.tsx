@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import apiClient from '@/services/api-client';
 import { 
   User, 
   Shield, 
@@ -78,8 +79,7 @@ export default function SettingsPage() {
   const [isPasswordChanging, setIsPasswordChanging] = useState(false);
   const [profileForm, setProfileForm] = useState({
     full_name: '',
-    email: '',
-    phone: ''
+    email: ''
   });
   
   // Invite member form state
@@ -91,7 +91,6 @@ export default function SettingsPage() {
     department: ''
   });
   
-  // Get user role and check if admin
   const getUserRole = (): UserRole => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('userRole') as UserRole) || 'customer';
@@ -99,79 +98,57 @@ export default function SettingsPage() {
     return 'customer';
   };
 
-  const getUserInfo = () => {
-    const role = getUserRole();
-    switch (role) {
-      case 'investment':
-        return { 
-          name: 'Anand Sharma', 
-          email: 'anand.sharma@acmecapital.com', 
-          role: 'Investment Analyst',
-          institution: 'ACME Capital Management',
-          isAdmin: true // For demo purposes
-        };
-      case 'bank':
-        return { 
-          name: 'Priya Singh', 
-          email: 'priya.singh@nationbank.com', 
-          role: 'Lending Manager',
-          institution: 'National Bank of India',
-          isAdmin: true // For demo purposes
-        };
-      case 'customer':
-        return { 
-          name: 'Rohan Verma', 
-          email: 'rohan.verma@gmail.com', 
-          role: 'Customer',
-          institution: null,
-          isAdmin: false
-        };
-      default:
-        return { 
-          name: 'Rohan Verma', 
-          email: 'rohan.verma@gmail.com', 
-          role: 'Customer',
-          institution: null,
-          isAdmin: false
-        };
-    }
-  };
-
-  const userInfo = getUserInfo();
   const userRole = getUserRole();
   const { user } = useAuth();
 
+  // Use real user data instead of hardcoded demo data
+  const getUserInfo = () => {
+    if (!user) {
+      return { 
+        name: 'Loading...', 
+        email: '', 
+        role: 'Guest',
+        institution: null,
+        isAdmin: false
+      };
+    }
+
+    return { 
+      name: user.full_name || 'Unknown User', 
+      email: user.email || '', 
+      role: user.role || 'Customer',
+      institution: user.organizationName || null,
+      isAdmin: user.role === 'ADMIN' || false
+    };
+  };
+
+  const userInfo = getUserInfo();
+
   // Initialize profile form with current user data
   useEffect(() => {
-    setProfileForm({
-      full_name: userInfo.name,
-      email: userInfo.email,
-      phone: '' // This would come from user profile API
-    });
-  }, [userInfo.name, userInfo.email]);
+    if (user) {
+      setProfileForm({
+        full_name: user.full_name || '',
+        email: user.email || ''
+      });
+    }
+  }, [user]);
 
   // Profile update handler
   const handleProfileSave = async () => {
     setIsProfileSaving(true);
     
     try {
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(profileForm)
+      const response = await apiClient.updateUserProfile({
+        name: profileForm.full_name,
+        email: profileForm.email
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update profile');
+      if (response.success) {
+        alert('Profile updated successfully');
+      } else {
+        alert(`Failed to update profile: ${response.error || 'Unknown error'}`);
       }
-
-      const result = await response.json();
-      
-      // Update local storage or context if needed
-      alert('Profile updated successfully');
       
     } catch (error) {
       console.error('Profile update error:', error);
@@ -193,7 +170,7 @@ export default function SettingsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         },
         body: JSON.stringify({
           email: inviteForm.email,
@@ -293,31 +270,23 @@ export default function SettingsPage() {
     setIsPasswordChanging(true);
     
     try {
-      const response = await fetch('/api/user/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          currentPassword: currentPassword,
-          newPassword: newPassword
-        })
+      const response = await apiClient.changePassword({
+        currentPassword: currentPassword,
+        newPassword: newPassword
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to change password');
+      if (response.success) {
+        alert('Password changed successfully');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        alert(`Failed to change password: ${response.error || 'Unknown error'}`);
       }
-
-      alert('Password changed successfully');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
       
     } catch (error: any) {
       console.error('Password change error:', error);
-      alert(error.message || 'Failed to change password. Please try again.');
+      alert('Failed to change password. Please try again.');
     } finally {
       setIsPasswordChanging(false);
     }
@@ -352,18 +321,6 @@ export default function SettingsPage() {
               type="text"
               value={profileForm.full_name}
               onChange={(e) => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
-              className="bg-white"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={profileForm.phone}
-              onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
-              placeholder="Enter your phone number"
               className="bg-white"
             />
           </div>

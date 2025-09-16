@@ -49,12 +49,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('userData');
 
+    console.log('AuthContext initializing:', { 
+      hasToken: !!storedToken, 
+      hasUser: !!storedUser,
+      tokenStart: storedToken?.substring(0, 20) + '...' || 'none'
+    });
+
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
+      console.log('Auth state restored from localStorage');
       // Verify token is still valid
       refreshUser();
     } else {
+      console.log('No stored auth data found');
       setIsLoading(false);
     }
   }, []);
@@ -62,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
+      console.log('Attempting login for:', email);
       
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
@@ -74,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
+        console.log('Login failed:', data.error);
         return {
           success: false,
           error: data.error || 'Login failed',
@@ -82,12 +92,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { user: userData, token: authToken } = data.data;
       
+      console.log('Login successful:', { 
+        user: userData.email, 
+        tokenReceived: !!authToken,
+        tokenStart: authToken?.substring(0, 20) + '...' || 'none'
+      });
+      
       // Store auth data
       localStorage.setItem('authToken', authToken);
       localStorage.setItem('userData', JSON.stringify(userData));
       setToken(authToken);
       setUser(userData);
 
+      console.log('Auth data stored and state updated');
       return { success: true };
 
     } catch (error) {

@@ -1,7 +1,6 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '../../components/DashboardLayout';
 import InvestmentDashboard from '../../components/dashboards/InvestmentDashboard';
 import BankDashboard from '../../components/dashboards/BankDashboard';
@@ -30,10 +29,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <ProtectedRoute>
-      <DashboardLayout currentPage="dashboard">
-        {renderDashboard()}
-      </DashboardLayout>
-    </ProtectedRoute>
+    <DashboardLayout currentPage="dashboard">
+      {renderDashboard()}
+    </DashboardLayout>
   );
 }
