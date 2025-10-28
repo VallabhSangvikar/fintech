@@ -30,6 +30,13 @@ interface SessionDetailResponse {
       page: number;
       text: string;
     }>;
+    financial_analysis?: {
+      final_report: string;
+      companies: string[];
+      analysis_messages: string[];
+      success: boolean;
+      query: string;
+    };
   }>;
 }
 
@@ -77,6 +84,8 @@ export async function GET(request: NextRequest) {
           timestamp: new Date(msg.timestamp).toISOString(),
           attachments: msg.attachments,
           citations: msg.citations,
+          // Include financial analysis data if available
+          financial_analysis: msg.financial_analysis,
         })),
       };
 

@@ -25,6 +25,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import DashboardLayout from '@/components/DashboardLayout';
 
 interface InvestmentTip {
@@ -52,17 +53,96 @@ export default function InvestmentTipsPage() {
   const { user } = useAuth();
   const [tips, setTips] = useState<InvestmentTip[]>([]);
   const [filteredTips, setFilteredTips] = useState<InvestmentTip[]>([]);
+  const [selectedTip, setSelectedTip] = useState<InvestmentTip | null>(null);
+  
+  // Helper functions to map API response to frontend format
+  const mapApiCategory = (apiCategory: string) => {
+    const mapping: { [key: string]: string } = {
+      'MARKET_ANALYSIS': 'market-analysis',
+      'RISK_MANAGEMENT': 'stocks',
+      'PORTFOLIO_OPTIMIZATION': 'mutual-funds',
+      'SECTOR_INSIGHTS': 'stocks'
+    };
+    return mapping[apiCategory] || 'market-analysis';
+  };
+
+  const mapApiRiskLevel = (apiRiskLevels: string[] | string) => {
+    if (Array.isArray(apiRiskLevels) && apiRiskLevels.length > 0) {
+      return apiRiskLevels[0].toLowerCase();
+    }
+    if (typeof apiRiskLevels === 'string') {
+      return apiRiskLevels.toLowerCase();
+    }
+    return 'medium';
+  };
+
+  const handleReadAnalysis = (tip: InvestmentTip) => {
+    setSelectedTip(tip);
+  };
+
+  const mapApiMarketImpact = (apiMarketImpact: string) => {
+    const mapping: { [key: string]: string } = {
+      'LOW': 'neutral',
+      'MEDIUM': 'bullish',
+      'HIGH': 'bullish'
+    };
+    return mapping[apiMarketImpact] || 'neutral';
+  };
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSource, setSelectedSource] = useState<string>('all');
   const [selectedRisk, setSelectedRisk] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // New states for API parameters
+  const [apiCategory, setApiCategory] = useState<string>('MARKET_ANALYSIS');
+  const [apiRiskLevel, setApiRiskLevel] = useState<string>('MEDIUM');
+  const [apiMarketImpact, setApiMarketImpact] = useState<string>('MEDIUM');
+  const [personalized, setPersonalized] = useState<boolean>(true);
 
-  // Load investment tips from API
-  const loadInvestmentTips = async () => {
+  useEffect(() => {
+    fetchStoredTips();
+  }, []);
+
+  const handleGenerateClick = () => {
+    generateAndLoadTips();
+  };
+
+  const processTipsResponse = (data: any) => {
+    if (data.success && data.data && Array.isArray(data.data.tips)) {
+      const mappedTips = data.data.tips.map((tip: any) => ({
+        id: tip.id || tip._id,
+        title: tip.title,
+        summary: tip.summary || tip.content?.substring(0, 150) + '...' || 'AI-generated investment insight',
+        content: tip.content,
+        category: mapApiCategory(tip.category) || 'market-analysis',
+        riskLevel: mapApiRiskLevel(tip.applicableRiskLevel) || 'medium',
+        timeHorizon: tip.timeHorizon || 'medium',
+        source: 'AI Analysis',
+        author: 'FinSight AI',
+        publishedAt: tip.publishedAt || new Date().toISOString(),
+        readTime: '3 min read',
+        tags: tip.tags || [],
+        isBookmarked: false,
+        viewCount: tip.viewCount || Math.floor(Math.random() * 1000),
+        confidence: tip.aiConfidenceScore || 85,
+        sourceUrl: tip.sourceUrl,
+        isPremium: tip.isPremium || false,
+        marketImpact: mapApiMarketImpact(tip.marketImpact) || 'neutral'
+      }));
+      setTips(mappedTips);
+      setFilteredTips(mappedTips);
+    } else {
+      console.log('No tips found in API response');
+      setTips([]);
+      setFilteredTips([]);
+    }
+  };
+
+  const fetchStoredTips = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/ai/investment-tips', {
+      const response = await fetch(`/api/ai/investment-tips`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -70,38 +150,15 @@ export default function InvestmentTipsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.tips && Array.isArray(data.tips)) {
-          // Map API response to our InvestmentTip interface
-          const mappedTips = data.tips.map((tip: any) => ({
-            id: tip.id || tip._id,
-            title: tip.title,
-            summary: tip.summary || tip.content?.substring(0, 150) + '...',
-            content: tip.content,
-            category: tip.category || 'market-analysis',
-            riskLevel: tip.risk_level || tip.riskLevel || 'medium',
-            timeHorizon: tip.time_horizon || tip.timeHorizon || 'medium',
-            source: tip.source || 'AI Analysis',
-            author: tip.author || 'FinSight AI',
-            publishedAt: tip.created_at || tip.publishedAt || new Date().toISOString(),
-            readTime: tip.read_time || tip.readTime || '3 min read',
-            tags: tip.tags || [],
-            isBookmarked: false,
-            viewCount: tip.view_count || tip.viewCount || 0,
-            confidence: tip.confidence || 85,
-            sourceUrl: tip.source_url || tip.sourceUrl,
-            isPremium: tip.is_premium || tip.isPremium || false,
-            marketImpact: tip.market_impact || tip.marketImpact || 'neutral'
-          }));
-          setTips(mappedTips);
-          setFilteredTips(mappedTips);
-        }
+        console.log('Stored investment tips API response:', data);
+        processTipsResponse(data);
       } else {
-        console.error('Failed to load investment tips:', response.statusText);
+        console.error('Failed to load stored investment tips:', response.statusText);
         setTips([]);
         setFilteredTips([]);
       }
     } catch (error) {
-      console.error('Error loading investment tips:', error);
+      console.error('Error loading stored investment tips:', error);
       setTips([]);
       setFilteredTips([]);
     } finally {
@@ -109,11 +166,43 @@ export default function InvestmentTipsPage() {
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      loadInvestmentTips();
+  // Renamed from loadInvestmentTips
+  const generateAndLoadTips = async () => {
+    try {
+      setIsLoading(true);
+      
+      const params = new URLSearchParams();
+      if (apiCategory !== 'all') params.append('category', apiCategory);
+      if (apiRiskLevel !== 'all') params.append('riskLevel', apiRiskLevel);
+      if (apiMarketImpact !== 'all') params.append('marketImpact', apiMarketImpact);
+      params.append('personalized', personalized.toString());
+      params.append('generateNew', 'true'); // Explicitly request generation
+      params.append('limit', '20');
+      params.append('offset', '0');
+      
+      const response = await fetch(`/api/ai/investment-tips?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Generated investment tips API response:', data);
+        processTipsResponse(data);
+      } else {
+        console.error('Failed to generate investment tips:', response.statusText);
+        setTips([]);
+        setFilteredTips([]);
+      }
+    } catch (error) {
+      console.error('Error generating investment tips:', error);
+      setTips([]);
+      setFilteredTips([]);
+    } finally {
+      setIsLoading(false);
     }
-  }, [user]);
+  };
 
   useEffect(() => {
     let filtered = tips;
@@ -151,7 +240,7 @@ export default function InvestmentTipsPage() {
   };
 
   const handleRefresh = () => {
-    loadInvestmentTips();
+    fetchStoredTips();
   };
 
   const formatDate = (dateString: string) => {
@@ -292,6 +381,88 @@ export default function InvestmentTipsPage() {
                       <SelectItem value="high">High Risk</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+              
+              {/* AI Parameters Section */}
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center mb-3">
+                  <Bot className="w-4 h-4 mr-2 text-blue-600" />
+                  <span className="text-sm font-medium text-slate-700">AI Tip Generation Parameters</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Category Focus</label>
+                    <Select value={apiCategory} onValueChange={setApiCategory}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        <SelectItem value="MARKET_ANALYSIS">Market Analysis</SelectItem>
+                        <SelectItem value="RISK_MANAGEMENT">Risk Management</SelectItem>
+                        <SelectItem value="PORTFOLIO_OPTIMIZATION">Portfolio Optimization</SelectItem>
+                        <SelectItem value="SECTOR_INSIGHTS">Sector Insights</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Risk Appetite</label>
+                    <Select value={apiRiskLevel} onValueChange={setApiRiskLevel}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Risk Level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Risk Levels</SelectItem>
+                        <SelectItem value="LOW">Conservative (Low)</SelectItem>
+                        <SelectItem value="MEDIUM">Moderate (Medium)</SelectItem>
+                        <SelectItem value="HIGH">Aggressive (High)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Market Impact</label>
+                    <Select value={apiMarketImpact} onValueChange={setApiMarketImpact}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Impact" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Impact Levels</SelectItem>
+                        <SelectItem value="LOW">Low Impact</SelectItem>
+                        <SelectItem value="MEDIUM">Medium Impact</SelectItem>
+                        <SelectItem value="HIGH">High Impact</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs text-slate-600 mb-1 block">Personalization</label>
+                    <Select 
+                      value={personalized.toString()} 
+                      onValueChange={(value) => setPersonalized(value === 'true')}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Personalized" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Personalized Tips</SelectItem>
+                        <SelectItem value="false">General Tips</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end mt-3">
+                  <Button 
+                    onClick={handleGenerateClick} 
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={isLoading}
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate AI Tips
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -435,7 +606,7 @@ export default function InvestmentTipsPage() {
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleReadAnalysis(tip)}>
                           <Eye className="w-4 h-4 mr-2" />
                           Read Analysis
                         </Button>
@@ -467,6 +638,34 @@ export default function InvestmentTipsPage() {
             </div>
           )}
         </div>
+
+        {selectedTip && (
+          <Dialog open={!!selectedTip} onOpenChange={(isOpen) => !isOpen && setSelectedTip(null)}>
+            <DialogContent className="sm:max-w-[625px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold">{selectedTip.title}</DialogTitle>
+                <div className="flex items-center space-x-4 text-sm text-slate-500 pt-2">
+                  <div className="flex items-center space-x-1">
+                    {getSourceIcon(selectedTip.source)}
+                    <span>{selectedTip.author}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{selectedTip.readTime}</span>
+                  </div>
+                  <Badge className={getRiskColor(selectedTip.riskLevel)}>
+                    <span className="capitalize">{selectedTip.riskLevel} Risk</span>
+                  </Badge>
+                </div>
+              </DialogHeader>
+              <div className="prose max-w-none text-slate-700 leading-relaxed py-4">
+                {selectedTip.content.split('\\n').map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </DashboardLayout>
     </ProtectedRoute>
   );

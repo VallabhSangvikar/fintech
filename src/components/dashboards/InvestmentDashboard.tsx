@@ -106,7 +106,6 @@ export default function InvestmentDashboard() {
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           },
         });
-        
         if (sessionsResponse.ok) {
           const sessionsData = await sessionsResponse.json();
           if (sessionsData.sessions && Array.isArray(sessionsData.sessions) && sessionsData.sessions.length > 0) {
@@ -173,7 +172,9 @@ export default function InvestmentDashboard() {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data1 = await response.json();
+        console.log('AI Response:', data1);
+        const data=data1.data;
         const aiResponse: ChatMessage = {
           id: messages.length + 2,
           type: 'ai',

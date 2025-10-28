@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { 
@@ -22,7 +22,8 @@ import {
   ExternalLink,
   Maximize2,
   Minimize2,
-  BookOpen
+  BookOpen,
+  CheckCircle
 } from 'lucide-react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Button } from "@/components/ui/button";
@@ -31,12 +32,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+const getUserRole = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('userRole') || 'customer';
+  }
+  return 'customer';
+};
+
 interface ChatMessage {
   id: number;
   type: 'user' | 'ai';
   content: string;
   timestamp: string;
   widgets?: string[];
+  // Enhanced data for financial reports
+  companies?: string[];
+  final_report?: string;
+  analysis_messages?: string[];
+  report_type?: 'financial_analysis' | 'standard';
 }
 
 interface ConversationHistory {
@@ -45,6 +58,8 @@ interface ConversationHistory {
   lastMessage: string;
   timestamp: string;
   messageCount: number;
+  // Add the raw date for sorting
+  rawTimestamp: Date;
 }
 
 interface Widget {
@@ -54,31 +69,6 @@ interface Widget {
   pinned: boolean;
   data?: any;
 }
-
-// Sample conversation history
-const sampleConversations: ConversationHistory[] = [
-  {
-    id: '1',
-    title: 'Q3 Portfolio Risk Analysis',
-    lastMessage: 'Based on current market conditions, I recommend reducing exposure to...',
-    timestamp: '2 hours ago',
-    messageCount: 15
-  },
-  {
-    id: '2',
-    title: 'Tesla Stock Deep Dive',
-    lastMessage: 'Tesla\'s P/E ratio of 65.2 is significantly higher than the automotive sector average...',
-    timestamp: '1 day ago',
-    messageCount: 8
-  },
-  {
-    id: '3',
-    title: 'Fraud Pattern Investigation',
-    lastMessage: 'I\'ve identified 3 suspicious transaction patterns in the last 48 hours...',
-    timestamp: '3 days ago',
-    messageCount: 22
-  }
-];
 
 // Sample initial messages for different personas
 const getInitialMessages = (userRole: string): ChatMessage[] => {
@@ -117,36 +107,190 @@ const stockData = [
   { name: 'Jun', value: 3200 }
 ];
 
+// Function to parse and render markdown-like content from LLM
+const parseReportContent = (content: string) => {
+  const lines = content.split('\n');
+  const parsed = [];
+  let currentSection = null;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (!line) continue; // Skip empty lines
+    
+    // Main headers (## Title)
+    if (line.startsWith('## ')) {
+      parsed.push({
+        type: 'main_header',
+        content: line.replace('## ', '').trim()
+      });
+    }
+    // Section headers (**1. Section Name:**)
+    else if (/^\*\*\d+\.\s/.test(line) && line.endsWith(':**')) {
+      parsed.push({
+        type: 'section_header',
+        content: line.replace(/^\*\*/, '').replace(/:\*\*$/, '').trim()
+      });
+    }
+    // Bold metadata (**Key:** value)
+    else if (/^\*\*[^*]+:\*\*/.test(line)) {
+      const [, key, value] = line.match(/^\*\*([^*]+):\*\*\s*(.*)$/) || [];
+      if (key && value) {
+        parsed.push({
+          type: 'metadata',
+          key: key.trim(),
+          value: value.trim()
+        });
+      }
+    }
+    // Bullet points with metrics (*   **Metric:** value - description)
+    else if (line.startsWith('*   **') && line.includes(':**')) {
+      const metricMatch = line.match(/^\*\s+\*\*([^*]+):\*\*\s*([^-]+)(?:\s*-\s*(.+))?/);
+      if (metricMatch) {
+        const [, metric, value, description] = metricMatch;
+        parsed.push({
+          type: 'financial_metric',
+          metric: metric.trim(),
+          value: value.trim(),
+          description: description ? description.trim() : ''
+        });
+      }
+    }
+    // Regular bullet points (*   Content)
+    else if (line.startsWith('*   ')) {
+      parsed.push({
+        type: 'bullet_point',
+        content: line.replace(/^\*\s+/, '').trim()
+      });
+    }
+    // Regular paragraphs
+    else if (line.length > 0) {
+      parsed.push({
+        type: 'paragraph',
+        content: line
+      });
+    }
+  }
+  
+  return parsed;
+};
+
+// Function to extract key metrics from financial report
+const extractKeyMetrics = (content: string) => {
+  const metrics = [];
+  
+  // Enhanced regex patterns to match the LLM output format
+  const patterns = {
+    pe: /\*\s+\*\*P\/E Ratio:\*\*\s*([\d.]+)/i,
+    profit: /\*\s+\*\*Profit Margin:\*\*\s*([\d.]+)%/i,
+    roe: /\*\s+\*\*Return on Equity[^*]*:\*\*\s*([\d.]+)%/i,
+    debt: /\*\s+\*\*Debt-to-Equity:\*\*\s*([\d.]+)/i,
+    current: /\*\s+\*\*Current Ratio:\*\*\s*([\d.]+)/i
+  };
+  
+  const peMatch = content.match(patterns.pe);
+  const profitMatch = content.match(patterns.profit);
+  const roeMatch = content.match(patterns.roe);
+  const debtMatch = content.match(patterns.debt);
+  const currentMatch = content.match(patterns.current);
+  
+  if (peMatch) {
+    const value = parseFloat(peMatch[1]);
+    metrics.push({ 
+      label: 'P/E Ratio', 
+      value: peMatch[1], 
+      type: value > 30 ? 'negative' : value > 20 ? 'neutral' : 'positive'
+    });
+  }
+  
+  if (profitMatch) {
+    const value = parseFloat(profitMatch[1]);
+    metrics.push({ 
+      label: 'Profit Margin', 
+      value: profitMatch[1] + '%', 
+      type: value > 15 ? 'positive' : value > 10 ? 'neutral' : 'negative'
+    });
+  }
+  
+  if (roeMatch) {
+    const value = parseFloat(roeMatch[1]);
+    metrics.push({ 
+      label: 'ROE', 
+      value: roeMatch[1] + '%', 
+      type: value > 100 ? 'neutral' : value > 15 ? 'positive' : 'negative'  // Very high ROE might be unusual
+    });
+  }
+  
+  if (debtMatch) {
+    const value = parseFloat(debtMatch[1]);
+    metrics.push({ 
+      label: 'Debt-to-Equity', 
+      value: debtMatch[1], 
+      type: value > 100 ? 'negative' : value > 50 ? 'neutral' : 'positive'
+    });
+  }
+  
+  if (currentMatch) {
+    const value = parseFloat(currentMatch[1]);
+    metrics.push({ 
+      label: 'Current Ratio', 
+      value: currentMatch[1], 
+      type: value >= 1 ? 'positive' : 'negative'
+    });
+  }
+  
+  return metrics;
+};
+
 export default function AIWorkbenchPage() {
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => getInitialMessages(getUserRole()));
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [activeContext, setActiveContext] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationHistory[]>([]);
 
-  // Get user role
-  const getUserRole = () => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userRole') || 'customer';
+  const fetchConversations = async () => {
+    try {
+      const response = await fetch('/api/ai/sessions', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched conversations:', data);
+        if (data.success && Array.isArray(data.data.sessions)) {
+          const mappedConversations = data.data.sessions.map((session: any) => ({
+            id: session.sessionId,
+            title: session.sessionTitle || 'Untitled Conversation',
+            lastMessage: session.lastMessage || 'No messages yet.',
+            timestamp: new Date(session.lastUpdatedAt).toLocaleString(),
+            messageCount: session.messageCount || 0,
+            rawTimestamp: new Date(session.createdAt),
+          })).sort((a: ConversationHistory, b: ConversationHistory) => b.rawTimestamp.getTime() - a.rawTimestamp.getTime()); // Sort by most recent
+          
+          setConversations(mappedConversations);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
     }
-    return 'customer';
   };
 
-  const userRole = getUserRole();
-
-  // Initialize with welcome message if no active conversation
-  if (messages.length === 0 && !activeConversation) {
-    setMessages(getInitialMessages(userRole));
-  }
+  useEffect(() => {
+    fetchConversations();
+  }, []);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
     const userMessage: ChatMessage = {
-      id: messages.length + 1,
+      id: Date.now(), // Use a unique ID
       type: 'user',
       content: inputMessage,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -168,31 +312,58 @@ export default function AIWorkbenchPage() {
         body: JSON.stringify({
           message: currentInput,
           context: 'workbench',
-          userRole: userRole,
-          conversationId: activeConversation || undefined
+          userRole: getUserRole(),
+          sessionId: activeConversation || undefined
         }),
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json();  
+        // Handle response - simplified approach
+        
+        // The API response is nested in the `data` property
+        const analysisData = data.data;
+        
+        if (!analysisData) {
+          throw new Error("Response from API is missing the 'data' object.");
+        }
+        
+        // Always update the active conversation ID with the one from the backend
+        if (analysisData.sessionId) {
+          setActiveConversation(analysisData.sessionId);
+        }
+        
+        // Get the actual response content (try multiple sources)
+        let responseContent = analysisData.final_report || 
+                            analysisData.response ||
+                            'I apologize, but I encountered an issue processing your request.';
+        
+        console.log('📝 Using response content:', responseContent.substring(0, 300) + '...');
+        
+        // Check if we have financial analysis data
+        const hasFinancialData = analysisData.success && analysisData.final_report;
         
         const aiMessage: ChatMessage = {
-          id: messages.length + 2,
+          id: Date.now(), // Use a unique ID
           type: 'ai',
-          content: data.response || 'I apologize, but I encountered an issue processing your request.',
+          content: responseContent,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          widgets: determineWidgets(currentInput, userRole)
+          companies: analysisData.companies || [],
+          final_report: analysisData.final_report,
+          analysis_messages: analysisData.messages || [],
+          report_type: hasFinancialData ? 'financial_analysis' : 'standard',
+          widgets: determineWidgets(currentInput, getUserRole())
         };
-
+       
         setMessages(prev => [...prev, aiMessage]);
       } else {
         // Fallback to mock response on API failure
         const aiMessage: ChatMessage = {
-          id: messages.length + 2,
+          id: Date.now(), // Use a unique ID
           type: 'ai',
-          content: getAIResponse(currentInput, userRole),
+          content: getAIResponse(currentInput, getUserRole()),
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          widgets: determineWidgets(currentInput, userRole)
+          widgets: determineWidgets(currentInput, getUserRole())
         };
 
         setMessages(prev => [...prev, aiMessage]);
@@ -202,16 +373,18 @@ export default function AIWorkbenchPage() {
       
       // Fallback to mock response on error
       const aiMessage: ChatMessage = {
-        id: messages.length + 2,
+        id: Date.now(), // Use a unique ID
         type: 'ai',
-        content: getAIResponse(currentInput, userRole),
+        content: getAIResponse(currentInput, getUserRole()),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        widgets: determineWidgets(currentInput, userRole)
+        widgets: determineWidgets(currentInput, getUserRole())
       };
 
       setMessages(prev => [...prev, aiMessage]);
     } finally {
       setIsTyping(false);
+      // Refresh conversation list after sending a message
+      fetchConversations();
     }
   };
 
@@ -342,19 +515,43 @@ export default function AIWorkbenchPage() {
     setWidgets(prev => prev.filter(w => w.id !== id));
   };
 
-  const loadConversation = (conversationId: string) => {
+  const loadConversation = async (conversationId: string) => {
     setActiveConversation(conversationId);
-    // In a real app, this would load the conversation from the database
-    const conversation = sampleConversations.find(c => c.id === conversationId);
-    if (conversation) {
-      setMessages([
-        {
-          id: 1,
-          type: 'ai',
-          content: conversation.lastMessage,
-          timestamp: conversation.timestamp
+    
+    try {
+      // Load conversation from API
+      const response = await fetch(`/api/ai/sessions?sessionId=${conversationId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.conversationHistory) {
+          const conversationHistory = data.data.conversationHistory.map((msg: any, index: number) => ({
+            id: index + 1,
+            type: msg.role === 'user' ? 'user' : 'ai',
+            content: msg.content,
+            timestamp: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            // Handle financial analysis data
+            ...(msg.financial_analysis && {
+              companies: msg.financial_analysis.companies,
+              final_report: msg.financial_analysis.final_report,
+              analysis_messages: msg.financial_analysis.analysis_messages,
+              report_type: 'financial_analysis'
+            }),
+            // Handle regular AI messages
+            ...(!msg.financial_analysis && msg.role === 'ai' && {
+              report_type: 'standard'
+            })
+          }));
+          
+          setMessages(conversationHistory);
         }
-      ]);
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
     }
   };
 
@@ -582,7 +779,7 @@ export default function AIWorkbenchPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout currentPage="ai-workbench">
-      <div className="h-full flex bg-slate-50">
+      <div className="h-screen flex bg-slate-50">
         {/* Left Panel - Context & History */}
         <div className={`${leftPanelCollapsed ? 'w-12' : 'w-80'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col`}>
           <div className="flex items-center justify-between p-4 border-b border-slate-200">
@@ -617,7 +814,7 @@ export default function AIWorkbenchPage() {
               <div className="p-4">
                 <h3 className="text-sm font-medium text-slate-700 mb-3">Recent Conversations</h3>
                 <div className="space-y-2">
-                  {sampleConversations.map((conv) => (
+                  {conversations.map((conv) => (
                     <button
                       key={conv.id}
                       onClick={() => loadConversation(conv.id)}
@@ -656,8 +853,8 @@ export default function AIWorkbenchPage() {
 
         {/* Center Panel - Chat Interface */}
         <div className="flex-1 flex flex-col">
-          {/* Chat Header */}
-          <div className="p-4 border-b border-slate-200 bg-white">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 bg-white border-b">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                 <Brain className="w-5 h-5 text-white" />
@@ -667,39 +864,29 @@ export default function AIWorkbenchPage() {
                 <p className="text-sm text-slate-500">Your intelligent financial command center</p>
               </div>
             </div>
+            <div className="flex items-center">
+              <Button variant="outline" size="icon" onClick={() => setRightPanelCollapsed(prev => !prev)} className="mr-2">
+                {rightPanelCollapsed ? <Maximize2 className="w-5 h-5" /> : <Minimize2 className="w-5 h-5" />}
+              </Button>
+              <Button onClick={handleSendMessage} disabled={isTyping}>
+                {isTyping ? 'Sending...' : 'Send'}
+              </Button>
+            </div>
           </div>
-
-          {/* Chat Messages */}
+          
+          {/* Chat messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`max-w-3xl ${message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200'} rounded-lg p-4`}>
-                  <p className="text-sm">{message.content}</p>
-                  <p className={`text-xs mt-2 ${message.type === 'user' ? 'text-blue-100' : 'text-slate-500'}`}>
-                    {message.timestamp}
-                  </p>
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-xs rounded-lg p-3 text-sm ${msg.type === 'user' ? 'bg-blue-500 text-white' : 'bg-white text-slate-800'}`}>
+                  {msg.content}
                 </div>
               </div>
             ))}
-
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-slate-200 rounded-lg p-4">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
-
-          {/* Chat Input */}
-          <div className="p-4 border-t border-slate-200 bg-white">
+          
+          {/* Message input */}
+          <div className="p-4 bg-white border-t">
             <div className="flex items-center space-x-2">
               <Button variant="ghost" size="sm">
                 <PaperclipIcon className="w-4 h-4" />
@@ -717,22 +904,20 @@ export default function AIWorkbenchPage() {
             </div>
           </div>
         </div>
-
-        {/* Right Panel - Widgets */}
-        <div className={`${rightPanelCollapsed ? 'w-12' : 'w-80'} bg-white border-l border-slate-200 transition-all duration-300 flex flex-col`}>
-          <div className="flex items-center justify-between p-4 border-b border-slate-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
-            >
-              {rightPanelCollapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        
+        {/* Right panel - Widgets */}
+        <div className={`flex flex-col bg-white border-l transition-width duration-300 ${rightPanelCollapsed ? 'w-16' : 'w-64'}`}>
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className={`text-lg font-semibold transition-opacity duration-300 ${rightPanelCollapsed ? 'opacity-0' : 'opacity-100'}`}>Analysis Widgets</h2>
+            <Button variant="outline" size="icon" onClick={() => setRightPanelCollapsed(prev => !prev)}>
+              {rightPanelCollapsed ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
             </Button>
-            {!rightPanelCollapsed && <h2 className="font-semibold text-slate-800">Analysis Widgets</h2>}
           </div>
-
-          {!rightPanelCollapsed && (
-            <div className="flex-1 overflow-y-auto p-4">
+          
+          {/* Widget list - Collapsible */}
+          <div className={`flex-1 overflow-y-auto transition-opacity duration-300 ${rightPanelCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <div className="p-4">
               {widgets.length === 0 ? (
                 <div className="text-center py-8">
                   <BarChart3 className="w-12 h-12 text-slate-300 mx-auto mb-4" />
@@ -744,7 +929,7 @@ export default function AIWorkbenchPage() {
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </DashboardLayout>

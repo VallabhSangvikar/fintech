@@ -227,9 +227,10 @@ export default function CustomerDashboard() {
           context: 'customer_dashboard',
         }),
       });
-
+      
       if (response.ok) {
-        const data = await response.json();
+        const tdata = await response.json();
+        const data=tdata.data;
         const aiResponse: ChatMessage = {
           id: messages.length + 2,
           type: 'ai',

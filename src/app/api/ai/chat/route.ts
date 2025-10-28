@@ -24,11 +24,22 @@ interface ChatResponse {
     text: string;
   }>;
   confidence?: number;
+  // Enhanced financial analysis data
+  success?: boolean;
+  query?: string;
+  companies?: string[];
+  final_report?: string;
+  messages?: string[];
 }
 
 // Helper function to call FastAPI service
 async function callFastAPIService(request: AIServiceRequest): Promise<AIServiceResponse> {
   const fastApiUrl = process.env.FASTAPI_URL || 'http://localhost:8000';
+  
+  console.log('🔍 Calling FastAPI service:', {
+    url: `${fastApiUrl}/chat`,
+    request: JSON.stringify(request, null, 2)
+  });
   
   try {
     const response = await fetch(`${fastApiUrl}/chat`, {
@@ -41,12 +52,16 @@ async function callFastAPIService(request: AIServiceRequest): Promise<AIServiceR
     });
 
     if (!response.ok) {
+      console.error('❌ FastAPI response not OK:', response.status, response.statusText);
       throw new Error(`FastAPI service error: ${response.status}`);
     }
 
-    return await response.json();
+    const jsonResponse = await response.json();
+    console.log('✅ FastAPI response received:', JSON.stringify(jsonResponse, null, 2));
+    
+    return jsonResponse;
   } catch (error) {
-    console.error('FastAPI service call failed:', error);
+    console.error('💥 FastAPI service call failed:', error);
     // Fallback response when AI service is unavailable
     return {
       response: "I'm currently unable to process your request. The AI service is temporarily unavailable. Please try again later.",
@@ -102,8 +117,9 @@ export async function POST(request: NextRequest) {
     let sessionTitle = '';
 
     // Handle session management
+    let conversationHistory: any[] = [];
     if (sessionId) {
-      // Verify existing session belongs to user
+      // Verify existing session and fetch history
       const existingSession = await aiSessionsCollection.findOne({
         sessionId: sessionId,
         userId: user.userId,
@@ -116,6 +132,7 @@ export async function POST(request: NextRequest) {
         );
       }
       sessionTitle = existingSession.sessionTitle;
+      conversationHistory = existingSession.conversationHistory || [];
     } else {
       // Create new session
       currentSessionId = uuidv4();
@@ -131,13 +148,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare AI service request
+    // Prepare request for FastAPI service
     const aiRequest: AIServiceRequest = {
       message,
       sessionId: currentSessionId,
       userId: user.userId,
       organizationId: user.organizationId,
-      context,
+      context: {
+        ...context,
+        conversationHistory: conversationHistory.slice(-10), // Send last 10 messages for context
+      },
     };
 
     // Save user message to database first
@@ -173,15 +193,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call AI service (this runs in parallel with database operations)
+    // Call AI service
     const aiResponse = await callFastAPIService(aiRequest);
 
-    // Save AI response to database
+    // Save AI response to the same session
     const aiMessage = {
       role: 'ai' as const,
-      content: aiResponse.response,
+      content: aiResponse.final_report || aiResponse.response || "Unable to process request",
       timestamp: new Date(),
       citations: aiResponse.citations || [],
+      financial_analysis: (aiResponse.success && aiResponse.final_report) ? {
+        final_report: aiResponse.final_report,
+        companies: aiResponse.companies || [],
+        analysis_messages: aiResponse.messages || [],
+        success: aiResponse.success,
+        query: aiResponse.query
+      } : undefined,
     };
 
     await aiSessionsCollection.updateOne(
@@ -194,12 +221,29 @@ export async function POST(request: NextRequest) {
 
     // Prepare response
     const chatResponse: ChatResponse = {
-      response: aiResponse.response,
+      response: aiResponse.final_report || aiResponse.response || "Unable to process request",
       sessionId: currentSessionId,
       sessionTitle: isNewSession ? sessionTitle : undefined,
       citations: aiResponse.citations,
       confidence: aiResponse.confidence,
+      // Pass through financial analysis data if available
+      ...(aiResponse.success && aiResponse.final_report && {
+        success: aiResponse.success,
+        final_report: aiResponse.final_report,
+        companies: aiResponse.companies || [],
+        messages: aiResponse.messages || [],
+        query: aiResponse.query
+      })
     };
+
+    console.log('📤 Sending response to frontend:', {
+      hasResponse: !!chatResponse.response,
+      hasFinalReport: !!chatResponse.final_report,
+      hasCompanies: !!chatResponse.companies,
+      hasSuccess: !!chatResponse.success,
+      responseKeys: Object.keys(chatResponse),
+      responsePreview: chatResponse.response.substring(0, 100) + '...'
+    });
 
     const processingTime = Date.now() - startTime;
     

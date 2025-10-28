@@ -233,6 +233,7 @@ export interface AIServiceRequest {
   context?: {
     documentIds?: string[];
     analysisType?: string;
+    conversationHistory?: AIMessage[];
   };
 }
 
@@ -242,6 +243,12 @@ export interface AIServiceResponse {
   citations?: AICitation[];
   confidence?: number;
   processingTimeMs: number;
+  // Enhanced financial analysis data
+  success?: boolean;
+  query?: string;
+  companies?: string[];
+  final_report?: string;
+  messages?: string[];
 }
 
 export interface DocumentAnalysisRequest {

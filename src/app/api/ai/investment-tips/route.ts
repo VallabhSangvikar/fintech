@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/middleware';
 import { connectMongoDB } from '@/lib/database';
 import { APIResponse } from '@/types/database';
+import { ObjectId } from 'mongodb';
 
 interface InvestmentTipResponse {
   id: string;
@@ -23,6 +24,39 @@ interface GenerateTipsRequest {
   marketConditions?: string;
 }
 
+// Helper function to fetch financial news from an external API
+async function getFinancialNews(keywords?: string) {
+  const apiKey = process.env.NEWS_API_KEY;
+  if (!apiKey) {
+    console.warn('NEWS_API_KEY is not set. Skipping news fetch.');
+    return [];
+  }
+
+  // Prioritize keywords if available, otherwise get top business headlines
+  const query = keywords ? encodeURIComponent(keywords) : 'finance OR investment OR economy';
+  const url = `https://newsapi.org/v2/everything?q=${query}&language=en&sortBy=relevancy&apiKey=${apiKey}&pageSize=10`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Failed to fetch news:', response.status, errorData.message);
+      return [];
+    }
+    const data = await response.json();
+    // Return a concise summary of each article
+    return data.articles.map((article: any) => ({
+      title: article.title,
+      summary: article.description,
+      source: article.source.name,
+      url: article.url,
+    }));
+  } catch (error) {
+    console.error('Error fetching financial news:', error);
+    return [];
+  }
+}
+
 // Helper function to generate personalized investment tips
 async function generatePersonalizedTips(
   userId: string,
@@ -35,6 +69,10 @@ async function generatePersonalizedTips(
 ) {
   const fastApiUrl = process.env.FASTAPI_URL || 'http://localhost:8000';
   
+  // Fetch relevant financial news
+  const newsKeywords = preferences?.categories?.join(' OR ') || preferences?.marketConditions;
+  const financialNews = await getFinancialNews(newsKeywords);
+
   try {
     const response = await fetch(`${fastApiUrl}/generate-investment-tips`, {
       method: 'POST',
@@ -46,6 +84,7 @@ async function generatePersonalizedTips(
         userId,
         organizationId,
         preferences,
+        news: financialNews, // Pass news to the AI service
       }),
     });
 
@@ -119,15 +158,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Get tips from database
-    const tips = await tipsCollection
+    let tips = await tipsCollection
       .find(query)
       .sort({ publishedAt: -1 })
       .skip(offset)
       .limit(limit)
       .toArray();
 
-    // If personalized tips requested and we have few tips, generate more
-    if (personalized && tips.length < 5) {
+    // If personalized tips requested or no tips found, generate more
+    if (personalized || tips.length === 0) {
       try {
         // Get user's risk appetite from customer profile if available
         const customerProfilesCollection = mongodb.collection('customer_profiles');
@@ -138,30 +177,30 @@ export async function GET(request: NextRequest) {
           categories: category ? [category] : undefined,
         };
 
-        const generatedTips = await generatePersonalizedTips(user.userId, user.organizationId, preferences);
+        const generatedTipsData = await generatePersonalizedTips(user.userId, user.organizationId, preferences);
         
-        // Store generated tips in database for future use
-        if (generatedTips.tips && generatedTips.tips.length > 0) {
-          const tipsToInsert = generatedTips.tips.map((tip: any) => ({
-            title: tip.title,
-            category: tip.category,
-            content: tip.content,
-            aiConfidenceScore: tip.aiConfidenceScore,
-            marketImpact: tip.marketImpact,
-            applicableRiskLevel: tip.applicableRiskLevel,
-            tags: tip.tags,
+        // Store generated tips in database and add to current response
+        if (generatedTipsData.tips && generatedTipsData.tips.length > 0) {
+          const tipsToInsert = generatedTipsData.tips.map((tip: any) => ({
+            ...tip, // Spread the original tip properties
             isActive: true,
             publishedAt: new Date(),
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
             sourcesUsed: ['AI Generated'],
             isPersonalized: true,
+            _id: new ObjectId(), // Generate a new ObjectId
           }));
 
           await tipsCollection.insertMany(tipsToInsert);
+          
+          // If the initial fetch was empty, use the newly generated tips for the response
+          if (tips.length === 0) {
+            tips = tipsToInsert;
+          }
         }
       } catch (error) {
         console.error('Failed to generate personalized tips:', error);
-        // Continue with existing tips
+        // Continue with existing tips, even if generation fails
       }
     }
 
