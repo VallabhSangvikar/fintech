@@ -22,7 +22,8 @@ import {
   PieChart,
   Receipt,
   Newspaper,
-  CreditCard
+  CreditCard,
+  LineChart
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -47,6 +48,7 @@ const getNavigationItems = (user: User | null) => {
   } else {
     // Individual customer
     baseItems.push(
+      { id: 'stock-hub', label: 'Stock Hub', icon: LineChart, href: '/stock-hub' },
       { id: 'investment-tips', label: 'Investment Tips', icon: Lightbulb, href: '/investment-tips' },
       { id: 'portfolio', label: 'My Portfolio', icon: PieChart, href: '/portfolio' },
       { id: 'goals', label: 'My Goals', icon: Target, href: '/goals' },
