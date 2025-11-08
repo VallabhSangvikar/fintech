@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import ReactMarkdown from 'react-markdown';
 import { 
   Brain,
   MessageSquare,
@@ -878,8 +879,39 @@ export default function AIWorkbenchPage() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs rounded-lg p-3 text-sm ${msg.type === 'user' ? 'bg-blue-500 text-white' : 'bg-white text-slate-800'}`}>
-                  {msg.content}
+                <div className={`max-w-2xl rounded-lg p-4 ${msg.type === 'user' ? 'bg-blue-500 text-white' : 'bg-white text-slate-800 shadow-sm border border-slate-200'}`}>
+                  {msg.type === 'ai' ? (
+                    <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:my-2 prose-ul:my-2 prose-li:my-1 prose-table:text-sm">
+                      <ReactMarkdown
+                        components={{
+                          h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-2 text-blue-700" {...props} />,
+                          h2: ({node, ...props}) => <h2 className="text-lg font-semibold mb-2 mt-3 text-blue-600" {...props} />,
+                          h3: ({node, ...props}) => <h3 className="text-base font-semibold mb-1 mt-2 text-blue-500" {...props} />,
+                          p: ({node, ...props}) => <p className="my-2 leading-relaxed" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc pl-5 my-2 space-y-1" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-2 space-y-1" {...props} />,
+                          li: ({node, ...props}) => <li className="my-1" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-semibold text-slate-900" {...props} />,
+                          em: ({node, ...props}) => <em className="italic text-slate-700" {...props} />,
+                          table: ({node, ...props}) => <div className="overflow-x-auto my-3"><table className="min-w-full divide-y divide-slate-200 border" {...props} /></div>,
+                          thead: ({node, ...props}) => <thead className="bg-slate-50" {...props} />,
+                          tbody: ({node, ...props}) => <tbody className="divide-y divide-slate-200" {...props} />,
+                          tr: ({node, ...props}) => <tr {...props} />,
+                          th: ({node, ...props}) => <th className="px-3 py-2 text-left text-xs font-medium text-slate-700 uppercase tracking-wider" {...props} />,
+                          td: ({node, ...props}) => <td className="px-3 py-2 text-sm" {...props} />,
+                          code: ({node, inline, ...props}: any) => 
+                            inline ? 
+                              <code className="bg-slate-100 px-1.5 py-0.5 rounded text-sm font-mono text-slate-800" {...props} /> :
+                              <code className="block bg-slate-100 p-3 rounded-lg text-sm font-mono overflow-x-auto my-2" {...props} />,
+                          blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-blue-400 pl-4 italic text-slate-600 my-2" {...props} />
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                  )}
                 </div>
               </div>
             ))}

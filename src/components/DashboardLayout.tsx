@@ -18,7 +18,11 @@ import {
   Brain,
   Target,
   Lightbulb,
-  LogOut
+  LogOut,
+  PieChart,
+  Receipt,
+  Newspaper,
+  CreditCard
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -44,7 +48,11 @@ const getNavigationItems = (user: User | null) => {
     // Individual customer
     baseItems.push(
       { id: 'investment-tips', label: 'Investment Tips', icon: Lightbulb, href: '/investment-tips' },
-      { id: 'goals', label: 'My Goals', icon: Target, href: '/goals' }
+      { id: 'portfolio', label: 'My Portfolio', icon: PieChart, href: '/portfolio' },
+      { id: 'goals', label: 'My Goals', icon: Target, href: '/goals' },
+      { id: 'expense-analysis', label: 'Expense Analysis', icon: Receipt, href: '/expense-analysis' },
+      { id: 'financial-news', label: 'Financial News', icon: Newspaper, href: '/financial-news' },
+      { id: 'credit-health', label: 'Credit Health', icon: CreditCard, href: '/credit-health' }
     );
   }
   

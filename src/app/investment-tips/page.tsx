@@ -641,10 +641,10 @@ export default function InvestmentTipsPage() {
 
         {selectedTip && (
           <Dialog open={!!selectedTip} onOpenChange={(isOpen) => !isOpen && setSelectedTip(null)}>
-            <DialogContent className="sm:max-w-[625px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-bold">{selectedTip.title}</DialogTitle>
-                <div className="flex items-center space-x-4 text-sm text-slate-500 pt-2">
+            <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col">
+              <DialogHeader className="flex-shrink-0">
+                <DialogTitle className="text-xl font-bold pr-6">{selectedTip.title}</DialogTitle>
+                <div className="flex items-center flex-wrap gap-2 text-sm text-slate-500 pt-2">
                   <div className="flex items-center space-x-1">
                     {getSourceIcon(selectedTip.source)}
                     <span>{selectedTip.author}</span>
@@ -653,15 +653,41 @@ export default function InvestmentTipsPage() {
                     <Clock className="w-4 h-4" />
                     <span>{selectedTip.readTime}</span>
                   </div>
+                  <div className="flex items-center space-x-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{formatDate(selectedTip.publishedAt)}</span>
+                  </div>
                   <Badge className={getRiskColor(selectedTip.riskLevel)}>
                     <span className="capitalize">{selectedTip.riskLevel} Risk</span>
                   </Badge>
+                  {selectedTip.confidence && (
+                    <Badge variant="outline" className="text-xs">
+                      {selectedTip.confidence}% confidence
+                    </Badge>
+                  )}
+                  <div className="flex items-center">
+                    {getMarketImpactIcon(selectedTip.marketImpact)}
+                    <span className="ml-1 capitalize text-xs">{selectedTip.marketImpact}</span>
+                  </div>
                 </div>
               </DialogHeader>
-              <div className="prose max-w-none text-slate-700 leading-relaxed py-4">
+              <div className="prose max-w-none text-slate-700 leading-relaxed py-4 overflow-y-auto flex-1">
                 {selectedTip.content.split('\\n').map((paragraph, index) => (
-                  <p key={index}>{paragraph}</p>
+                  <p key={index} className="mb-3">{paragraph}</p>
                 ))}
+                
+                {selectedTip.tags.length > 0 && (
+                  <div className="mt-6 pt-4 border-t">
+                    <p className="text-sm font-semibold text-slate-700 mb-2">Related Topics:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTip.tags.map((tag, tagIndex) => (
+                        <Badge key={tagIndex} variant="outline" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>

@@ -51,12 +51,14 @@ export default function CustomerDashboard() {
   const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [creditScore, setCreditScore] = useState(742);
+  const [creditScore, setCreditScore] = useState(650); // Start with base score
+  const [financialHealthScore, setFinancialHealthScore] = useState(65);
   const [isLoading, setIsLoading] = useState(true);
   
   // Local state instead of context
   const [goals, setGoals] = useState<any[]>([]);
   const [investmentTips, setInvestmentTips] = useState<any[]>([]);
+  const [userPortfolio, setUserPortfolio] = useState<any[]>([]);
 
   // Initialize API client with token
   useEffect(() => {
@@ -67,6 +69,64 @@ export default function CustomerDashboard() {
       console.log('No token available in CustomerDashboard');
     }
   }, [token]);
+
+  // Calculate credit score based on user's financial behavior
+  const calculateCreditScore = (goals: any[], portfolio: any[]) => {
+    let baseScore = 650; // Base credit score
+    
+    // Goal-based scoring (up to 100 points)
+    if (goals.length > 0) {
+      baseScore += Math.min(goals.length * 15, 50); // Points for having goals (max 50)
+      
+      // Calculate average goal completion
+      const totalProgress = goals.reduce((sum, goal) => {
+        const progress = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0;
+        return sum + Math.min(progress, 100);
+      }, 0);
+      const avgProgress = totalProgress / goals.length;
+      baseScore += Math.floor(avgProgress / 2); // Up to 50 points for goal progress
+    }
+
+    // Portfolio diversification (up to 75 points)
+    if (portfolio.length > 0) {
+      baseScore += Math.min(portfolio.length * 12, 60); // Points for diversification
+      
+      // Check for different asset types
+      const categories = new Set(portfolio.map(item => item.product_category));
+      baseScore += categories.size * 5; // 5 points per different category
+    }
+
+    // Account activity bonus (simulate based on data presence - up to 50 points)
+    if (user?.last_login_at) {
+      baseScore += 25; // Active user bonus
+    }
+    if (goals.length > 0 || portfolio.length > 0) {
+      baseScore += 25; // Engagement bonus
+    }
+
+    return Math.min(Math.max(baseScore, 300), 850); // Cap between 300-850
+  };
+
+  // Calculate financial health score
+  const calculateFinancialHealth = (goals: any[], portfolio: any[]) => {
+    let healthScore = 50; // Base health score
+
+    // Goals progress (up to 30 points)
+    if (goals.length > 0) {
+      const totalProgress = goals.reduce((sum, goal) => {
+        const progress = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0;
+        return sum + Math.min(progress, 100);
+      }, 0);
+      healthScore += (totalProgress / goals.length) * 0.3;
+    }
+
+    // Investment activity (up to 20 points)
+    if (portfolio.length > 0) {
+      healthScore += Math.min(portfolio.length * 3, 20);
+    }
+
+    return Math.min(Math.max(healthScore, 0), 100);
+  };
 
   // Load real data from APIs
   useEffect(() => {
@@ -117,6 +177,50 @@ export default function CustomerDashboard() {
             created_at: new Date()
           }
         ]);
+
+        setUserPortfolio([
+          {
+            id: 1,
+            product_name: "Nifty 50 Index Fund",
+            product_category: "INDEX_FUND",
+            risk_level: "MEDIUM",
+            expected_return: "12-15%",
+            description: "Diversified equity fund tracking the Nifty 50 index"
+          },
+          {
+            id: 2,
+            product_name: "Monthly SIP - HDFC Top 100",
+            product_category: "SIP",
+            risk_level: "MEDIUM",
+            expected_return: "10-14%",
+            description: "Systematic investment plan in large-cap equity fund"
+          },
+          {
+            id: 3,
+            product_name: "Government Savings Bonds",
+            product_category: "GOVERNMENT_BOND",
+            risk_level: "LOW",
+            expected_return: "7-8%",
+            description: "Safe government-backed investment with steady returns"
+          }
+        ]);
+
+        // Calculate scores for demo data
+        const demoGoals = [
+          { id: 1, goal_name: "Emergency Fund", target_amount: 500000, current_amount: 125000 },
+          { id: 2, goal_name: "House Down Payment", target_amount: 2000000, current_amount: 450000 }
+        ];
+        const demoPortfolio = [
+          { product_category: "INDEX_FUND" },
+          { product_category: "SIP" }, 
+          { product_category: "GOVERNMENT_BOND" }
+        ];
+
+        const calculatedCreditScore = calculateCreditScore(demoGoals, demoPortfolio);
+        const calculatedHealthScore = calculateFinancialHealth(demoGoals, demoPortfolio);
+        
+        setCreditScore(calculatedCreditScore);
+        setFinancialHealthScore(calculatedHealthScore);
         
         setIsLoading(false);
         return;
@@ -140,17 +244,39 @@ export default function CustomerDashboard() {
         }
 
         // Load financial goals
+        let loadedGoals: any[] = [];
         try {
           const goalsResponse = await apiClient.getGoals();
           console.log('Goals response:', goalsResponse);
           if (goalsResponse.success && goalsResponse.data) {
-            setGoals(Array.isArray(goalsResponse.data) ? goalsResponse.data.slice(0, 3) : []);
+            loadedGoals = Array.isArray(goalsResponse.data) ? goalsResponse.data.slice(0, 3) : [];
+            setGoals(loadedGoals);
           }
         } catch (error: any) {
           console.error('Error loading goals:', error);
-          // Use demo data on error
           setGoals([]);
         }
+
+        // Load user portfolio (investment products)
+        let loadedPortfolio: any[] = [];
+        try {
+          const portfolioResponse = await apiClient.getPortfolio();
+          console.log('Portfolio response:', portfolioResponse);
+          if (portfolioResponse.success && portfolioResponse.data) {
+            loadedPortfolio = Array.isArray(portfolioResponse.data) ? portfolioResponse.data : [];
+            setUserPortfolio(loadedPortfolio);
+          }
+        } catch (error: any) {
+          console.error('Error loading portfolio:', error);
+          setUserPortfolio([]);
+        }
+
+        // Calculate real credit score and financial health
+        const calculatedCreditScore = calculateCreditScore(loadedGoals, loadedPortfolio);
+        const calculatedHealthScore = calculateFinancialHealth(loadedGoals, loadedPortfolio);
+        
+        setCreditScore(calculatedCreditScore);
+        setFinancialHealthScore(calculatedHealthScore);
 
         // Load chat sessions (recent AI conversations)
         const sessionsResponse = await fetch('/api/ai/sessions', {
@@ -188,17 +314,7 @@ export default function CustomerDashboard() {
     }
   }, [user]);
 
-  useEffect(() => {
-    // Simulate real-time credit score updates
-    const interval = setInterval(() => {
-      setCreditScore(prev => {
-        const change = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
-        return Math.max(300, Math.min(900, prev + change));
-      });
-    }, 5000);
 
-    return () => clearInterval(interval);
-  }, []);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
@@ -307,7 +423,12 @@ export default function CustomerDashboard() {
         <h2 className="text-2xl font-bold mb-2">
           Good morning, {user?.full_name?.split(' ')[0] || 'there'}! 👋
         </h2>
-        <p className="text-blue-100">Your financial health score has improved by 5 points this month. Keep up the great work!</p>
+        <p className="text-blue-100">
+          Your financial health score is {financialHealthScore}/100. 
+          {financialHealthScore >= 80 ? ' Excellent financial planning!' : 
+           financialHealthScore >= 60 ? ' Good progress on your goals!' : 
+           ' Let\'s work on improving your financial health together!'}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -548,6 +669,80 @@ export default function CustomerDashboard() {
             >
               Explore Investment Options
             </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Portfolio Overview */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800">Your Investment Portfolio</h3>
+            <p className="text-sm text-slate-600">Track your stocks, funds, and investment products</p>
+          </div>
+          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center">
+            Add Investment
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="border border-slate-200 rounded-lg p-4 animate-pulse">
+                <div className="h-4 bg-slate-200 rounded mb-2"></div>
+                <div className="h-3 bg-slate-200 rounded mb-3 w-3/4"></div>
+                <div className="h-3 bg-slate-200 rounded mb-4 w-1/2"></div>
+                <div className="flex justify-between">
+                  <div className="h-3 bg-slate-200 rounded w-1/3"></div>
+                  <div className="h-3 bg-slate-200 rounded w-1/4"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : userPortfolio.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userPortfolio.map((investment) => (
+              <div key={investment.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      {investment.product_category === 'INDEX_FUND' && <TrendingUp className="w-4 h-4 text-blue-600" />}
+                      {investment.product_category === 'REAL_ESTATE' && <Target className="w-4 h-4 text-blue-600" />}
+                      {investment.product_category === 'SIP' && <DollarSign className="w-4 h-4 text-blue-600" />}
+                      {investment.product_category === 'GOVERNMENT_BOND' && <Shield className="w-4 h-4 text-blue-600" />}
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded border ${getRiskColor(investment.risk_level)}`}>
+                      {investment.risk_level}
+                    </span>
+                  </div>
+                </div>
+
+                <h4 className="font-semibold text-slate-800 mb-2">{investment.product_name}</h4>
+                <p className="text-sm text-slate-600 mb-3">{investment.description}</p>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500">Expected Return</p>
+                    <p className="text-sm font-bold text-emerald-600">{investment.expected_return || 'N/A'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-500">Category</p>
+                    <p className="text-sm font-medium text-slate-800">
+                      {investment.product_category.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <TrendingUp className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 mb-4">No investments in your portfolio yet</p>
+            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+              Start Investing
+            </button>
           </div>
         )}
       </div>

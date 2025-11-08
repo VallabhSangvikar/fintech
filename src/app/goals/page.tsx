@@ -201,22 +201,53 @@ export default function GoalsPage() {
   };
 
   const handleEditGoal = (goal: FinancialGoal) => {
-    setEditingGoal(goal);
-    setNewGoal({
+    console.log('Editing goal:', goal);
+    
+    // Format the date properly for input type="date" (YYYY-MM-DD)
+    let formattedDate = '';
+    if (goal.target_date || goal.targetDate) {
+      const dateStr = goal.target_date || goal.targetDate || '';
+      // Handle different date formats
+      if (dateStr) {
+        try {
+          const date = new Date(dateStr);
+          if (!isNaN(date.getTime())) {
+            // Format as YYYY-MM-DD
+            formattedDate = date.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          console.error('Date parsing error:', e);
+        }
+      }
+    }
+    
+    const editGoalData = {
       title: goal.goal_name || goal.title || '',
-      description: goal.description || '',
+      description: goal.description || `Financial goal: ${goal.goal_name || 'Unnamed'}`,
       targetAmount: (goal.target_amount || goal.targetAmount || 0).toString(),
       currentAmount: (goal.current_amount || goal.currentAmount || 0).toString(),
-      targetDate: goal.target_date || goal.targetDate || '',
+      targetDate: formattedDate,
       category: goal.category || 'other',
       priority: goal.priority || 'medium',
-      monthlyContribution: (goal.monthlyContribution || 0).toString()
-    });
+      monthlyContribution: (goal.monthlyContribution || '').toString()
+    };
+    
+    console.log('Setting edit form data:', editGoalData);
+    
+    setEditingGoal(goal);
+    setNewGoal(editGoalData);
     setIsCreateModalOpen(true);
+    console.log('Modal should be open now');
   };
 
   const handleUpdateGoal = async () => {
-    if (!editingGoal) return;
+    console.log('Update goal called, editingGoal:', editingGoal);
+    console.log('Form data:', newGoal);
+    
+    if (!editingGoal) {
+      console.error('No goal being edited');
+      return;
+    }
     
     try {
       const goalData = {
@@ -226,7 +257,9 @@ export default function GoalsPage() {
         target_date: newGoal.targetDate,
       };
 
+      console.log('Sending goal data:', goalData);
       const response = await apiClient.updateGoal(editingGoal.id, goalData);
+      console.log('Update response:', response);
 
       if (response.success) {
         // Reload goals from server to get updated data
@@ -234,6 +267,7 @@ export default function GoalsPage() {
         setIsCreateModalOpen(false);
         setEditingGoal(null);
         resetForm();
+        console.log('Goal updated successfully');
       } else {
         alert(`Failed to update goal: ${response.error || 'Unknown error'}`);
       }

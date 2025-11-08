@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/middleware';
-import { connectMongoDB } from '@/lib/database';
+import { connectMongoDB, mysqlPool } from '@/lib/database';
 import { APIResponse } from '@/types/database';
 import { ObjectId } from 'mongodb';
 
@@ -65,6 +65,7 @@ async function generatePersonalizedTips(
     riskAppetite?: string;
     categories?: string[];
     marketConditions?: string;
+    portfolio?: any[];
   }
 ) {
   const fastApiUrl = process.env.FASTAPI_URL || 'http://localhost:8000';
@@ -84,6 +85,7 @@ async function generatePersonalizedTips(
         userId,
         organizationId,
         preferences,
+        portfolio: preferences?.portfolio || [], // Pass user's portfolio
         news: financialNews, // Pass news to the AI service
       }),
     });
@@ -172,9 +174,27 @@ export async function GET(request: NextRequest) {
         const customerProfilesCollection = mongodb.collection('customer_profiles');
         const profile = await customerProfilesCollection.findOne({ userId: user.userId });
         
+        // Get user's current portfolio from MySQL
+        const [portfolioRows] = await mysqlPool.execute(
+          `SELECT product_name, product_category, risk_level, expected_return, description
+           FROM investment_products 
+           WHERE user_id = ? 
+           ORDER BY id DESC`,
+          [user.userId]
+        ) as any;
+
+        const userPortfolio = portfolioRows.map((item: any) => ({
+          name: item.product_name,
+          category: item.product_category,
+          riskLevel: item.risk_level,
+          expectedReturn: item.expected_return,
+          description: item.description
+        }));
+        
         const preferences = {
           riskAppetite: profile?.riskAppetite || riskLevel,
           categories: category ? [category] : undefined,
+          portfolio: userPortfolio, // Include user's current investments
         };
 
         const generatedTipsData = await generatePersonalizedTips(user.userId, user.organizationId, preferences);

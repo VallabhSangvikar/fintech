@@ -234,6 +234,7 @@ export interface AIServiceRequest {
     documentIds?: string[];
     analysisType?: string;
     conversationHistory?: AIMessage[];
+    recentFinancialNews?: string[];
   };
 }
 

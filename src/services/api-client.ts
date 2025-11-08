@@ -258,6 +258,59 @@ class APIClient {
     });
   }
 
+  // Portfolio APIs
+  async getPortfolio(): Promise<APIResponse<any[]>> {
+    return this.request<any[]>('/customer/portfolio');
+  }
+
+  async addToPortfolio(data: {
+    product_name: string;
+    product_category: string;
+    risk_level: string;
+    expected_return?: string;
+    description?: string;
+  }): Promise<APIResponse<any>> {
+    return this.request<any>('/customer/portfolio', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Expense Analysis APIs
+  async getExpenseAnalysisReports(): Promise<APIResponse<any[]>> {
+    return this.request<any[]>('/expenses');
+  }
+
+  async analyzeExpenseDocument(file: File): Promise<APIResponse<any>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return fetch(`${this.baseURL}/expenses`, {
+      method: 'POST',
+      headers: {
+        Authorization: this.token ? `Bearer ${this.token}` : '',
+      },
+      body: formData,
+    }).then(res => res.json());
+  }
+
+  // Financial News APIs
+  async getFinancialNews(params?: {
+    category?: string;
+    search?: string;
+    page?: number;
+  }): Promise<APIResponse<any>> {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.append('category', params.category);
+    if (params?.search) searchParams.append('search', params.search);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    
+    const queryString = searchParams.toString();
+    const url = queryString ? `/financial-news?${queryString}` : '/financial-news';
+    
+    return this.request<any>(url);
+  }
+
   // Knowledge Base APIs
   async getKnowledgeBase(): Promise<APIResponse<any[]>> {
     return this.request<any[]>('/knowledge-base');
@@ -275,6 +328,11 @@ class APIClient {
       },
       body: formData,
     }).then(res => res.json());
+  }
+
+  // Credit Health APIs
+  async getCreditHealth(): Promise<APIResponse<any>> {
+    return this.request<any>('/credit-health');
   }
 
   // Database Test

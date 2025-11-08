@@ -112,7 +112,23 @@ CREATE TABLE investment_products (
     risk_level ENUM('LOW', 'MEDIUM', 'HIGH') NOT NULL,
     expected_return VARCHAR(255),
     description TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_ip_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE expense_analysis_reports (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    document_name VARCHAR(255) NOT NULL,
+    document_path TEXT,
+    analysis_report LONGTEXT NOT NULL,
+    extracted_expenses JSON,
+    total_expenses DECIMAL(12,2),
+    analysis_insights LONGTEXT,
+    recommendations LONGTEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_ear_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 5. Shared/System Tables
