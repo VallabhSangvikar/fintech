@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Indian Stock Universe - Comprehensive list for search
+// Indian Stock Universe - Comprehensive list for quick search
 const STOCK_DATABASE = [
   // Banking & Finance
   { ticker: 'HDFCBANK.NS', name: 'HDFC Bank', sector: 'Banking', exchange: 'NSE' },
@@ -77,6 +77,38 @@ const STOCK_DATABASE = [
   { ticker: 'PAYTM.NS', name: 'Paytm', sector: 'FinTech', exchange: 'NSE' },
 ];
 
+// Universal company name to ticker mapping using AI
+async function getTickerFromCompanyName(companyName: string): Promise<{ ticker: string; name: string; sector?: string } | null> {
+  try {
+    // Call backend AI to extract ticker
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `Extract the NSE ticker symbol for: ${companyName}. Reply ONLY with the ticker in format SYMBOL.NS (e.g., TCS.NS, RELIANCE.NS). If not found, reply "NOT_FOUND".`,
+        user_id: 'stock-search',
+        conversation_id: `search-${Date.now()}`
+      })
+    });
+
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const tickerMatch = data.response?.match(/([A-Z&-]+)\.NS/);
+    
+    if (tickerMatch) {
+      return {
+        ticker: tickerMatch[0],
+        name: companyName,
+        sector: 'Unknown'
+      };
+    }
+  } catch (error) {
+    console.error('AI ticker extraction failed:', error);
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -85,23 +117,46 @@ export async function GET(request: NextRequest) {
     if (!query || query.length < 1) {
       return NextResponse.json({
         success: true,
-        results: STOCK_DATABASE.slice(0, 20), // Return top 20 stocks
+        results: STOCK_DATABASE.slice(0, 20),
         total: STOCK_DATABASE.length
       });
     }
 
-    // Search by name, ticker, or sector
-    const results = STOCK_DATABASE.filter(stock => 
+    // First: Try exact match in database
+    const exactMatches = STOCK_DATABASE.filter(stock => 
       stock.name.toLowerCase().includes(query) ||
       stock.ticker.toLowerCase().includes(query) ||
       stock.sector.toLowerCase().includes(query)
     );
 
+    if (exactMatches.length > 0) {
+      return NextResponse.json({
+        success: true,
+        results: exactMatches.slice(0, 10),
+        total: exactMatches.length,
+        source: 'database'
+      });
+    }
+
+    // Second: If no matches, try AI-powered universal search
+    console.log(`No database matches for "${query}", trying AI extraction...`);
+    const aiResult = await getTickerFromCompanyName(query);
+    
+    if (aiResult) {
+      return NextResponse.json({
+        success: true,
+        results: [aiResult],
+        total: 1,
+        source: 'ai'
+      });
+    }
+
+    // No results found
     return NextResponse.json({
-      success: true,
-      results: results.slice(0, 15), // Limit to 15 results
-      total: results.length,
-      query
+      success: false,
+      results: [],
+      total: 0,
+      message: `No stocks found for "${query}"`
     });
 
   } catch (error) {
