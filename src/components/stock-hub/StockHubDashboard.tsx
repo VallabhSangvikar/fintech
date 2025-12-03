@@ -6,6 +6,7 @@ import MarketIndices from './MarketIndices';
 import StockSearch from './StockSearch';
 import StockCard from './StockCard';
 import StockComparison from './StockComparison';
+import MarkdownResponse from './MarkdownResponse';
 
 interface SelectedStock {
   ticker: string;
@@ -1453,35 +1454,52 @@ export default function StockHubDashboard() {
                   <p className="text-gray-400 mt-4">AI is analyzing with real-time data...</p>
                 </div>
               ) : agentResponse?.success ? (
-                <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-6">
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="p-2 bg-blue-500/20 rounded-lg">
-                      <Bot className="text-blue-400" size={24} />
+                <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 backdrop-blur-xl border border-blue-500/30 rounded-xl p-8 shadow-2xl">
+                  {/* Header */}
+                  <div className="flex items-start gap-4 mb-6 pb-6 border-b border-white/10">
+                    <div className="p-3 bg-gradient-to-br from-blue-500/30 to-purple-500/30 rounded-xl">
+                      <Bot className="text-blue-400" size={28} />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-white mb-1">AI Response:</h3>
-                      {agentResponse.stocks_mentioned && agentResponse.stocks_mentioned.length > 0 && (
-                        <p className="text-xs text-gray-400">
-                          Analyzed: {agentResponse.stocks_mentioned.join(', ')}
-                        </p>
+                      <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                        AI Stock Advisor
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                          Live Data
+                        </span>
+                      </h3>
+                      <p className="text-sm text-gray-400">
+                        Powered by Finnhub API • Real-time market data • Gemini AI Analysis
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Enhanced Response with Markdown */}
+                  <div className="bg-black/20 rounded-xl p-6 border border-white/5">
+                    <MarkdownResponse content={agentResponse.response} />
+                  </div>
+
+                  {/* Footer Metadata */}
+                  <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-4 text-gray-500">
+                      <span className="flex items-center gap-1">
+                        ✅ Real-time Finnhub data
+                      </span>
+                      <span className="flex items-center gap-1">
+                        🤖 AI-powered analysis
+                      </span>
+                      {agentResponse.timestamp && (
+                        <span>
+                          🕐 {new Date(agentResponse.timestamp).toLocaleTimeString()}
+                        </span>
                       )}
                     </div>
                   </div>
-                  <div className="prose prose-invert max-w-none">
-                    <div className="whitespace-pre-wrap text-gray-300">
-                      {agentResponse.response}
-                    </div>
-                  </div>
-                  {agentResponse.context_used && (
-                    <div className="mt-4 text-xs text-gray-500">
-                      ✅ Using real-time Finnhub data
-                    </div>
-                  )}
                 </div>
               ) : (
-                <div className="text-center py-12 border-2 border-dashed border-white/10 rounded-xl">
-                  <Bot className="text-gray-600 mx-auto mb-4" size={48} />
-                  <p className="text-gray-400">Ask me a question about stocks and I'll provide AI-powered insights!</p>
+                <div className="text-center py-16 border-2 border-dashed border-white/10 rounded-xl bg-white/5">
+                  <Bot className="text-gray-600 mx-auto mb-4" size={56} />
+                  <h4 className="text-xl font-semibold text-white mb-2">Ask Me Anything!</h4>
+                  <p className="text-gray-400">I'll analyze stocks using real-time Finnhub data and provide comprehensive insights.</p>
                 </div>
               )}
             </div>
